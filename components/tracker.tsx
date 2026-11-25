@@ -20,9 +20,7 @@ export default function Tracker({ token }: { token: string }) {
 
   // PWA: per-appointment manifest + service worker
   useEffect(() => {
-    const l = document.createElement('link'); l.rel = 'manifest'; l.href = `/t/${token}/manifest.webmanifest`; document.head.appendChild(l);
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
-    return () => { l.remove(); };
   }, [token]);
 
   // In-app notification fallback: banner + vibration + (when allowed) system notification

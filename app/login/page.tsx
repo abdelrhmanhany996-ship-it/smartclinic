@@ -9,7 +9,6 @@ import { api } from '@/lib/client';
 const DEMOS = [
   { label: 'Receptionist', email: 'reception@nilecare.demo', pw: 'Demo@123' },
   { label: 'Doctor', email: 'sara@nilecare.demo', pw: 'Demo@123' },
-  { label: 'Super Admin', email: 'admin@smartclinic.app', pw: 'Admin@123' },
 ];
 
 function Form() {

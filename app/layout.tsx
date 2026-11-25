@@ -7,7 +7,6 @@ import { Pwa } from '@/components/pwa';
 export const metadata: Metadata = {
   title: { default: 'SmartClinic — Less Waiting. Better Care.', template: '%s · SmartClinic' },
   description: 'Real-time clinic appointments and patient queue management.',
-  manifest: '/manifest.webmanifest',
   applicationName: 'SmartClinic',
   appleWebApp: { capable: true, title: 'SmartClinic', statusBarStyle: 'default' },
   icons: { icon: '/icons/icon.svg', apple: '/icons/apple-touch-icon.png' },

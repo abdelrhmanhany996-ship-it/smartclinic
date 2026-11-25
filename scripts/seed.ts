@@ -40,7 +40,8 @@ async function appt(clinicId: string, doc: { id: string; code: string }, pid: st
 async function main() {
   const exists = await q1('select 1 from clinics limit 1');
   if (exists) { console.log('Database already seeded (run `npm run db:reset` to start over).'); await pool.end(); return; }
-  await user(null, 'super_admin', 'admin@smartclinic.app', 'Platform Owner', ADMIN);
+  // never create the public demo super admin if a real one already exists (production)
+  if (!(await q1("select 1 from users where role='super_admin'"))) await user(null, 'super_admin', 'admin@smartclinic.app', 'Platform Owner', ADMIN);
 
   const c1 = (await pool.query(
     `insert into clinics(slug,name,name_ar,address,phone,email,brand_color,settings) values('nile-care','Nile Care Clinic','عيادة نايل كير','12 Corniche El Nile, Maadi, Cairo','+20 2 2735 1100','hello@nilecare.demo','#087E83',$1) returning id`,

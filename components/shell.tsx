@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Bell, BarChart3, Building2, CalendarDays, CalendarPlus, CreditCard, LayoutGrid, LogOut, Menu, Settings, Stethoscope, Timer, Users, UsersRound, X, UserCog } from 'lucide-react';
 import { Logo, PrefsToggles, cx } from './ui';
+import { InstallButton } from './install-button';
 import { usePrefs } from './providers';
 import { api, useLive } from '@/lib/client';
 
@@ -59,6 +60,7 @@ export function Shell({ role, children }: { role: 'receptionist' | 'doctor' | 's
       <div className="border-t border-white/10 p-4">
         <div className="mb-2 flex items-center gap-3"><div className="grid size-9 place-items-center rounded-full bg-primary text-sm font-bold text-primary-fg">{me.data?.user.name?.[0] ?? '·'}</div>
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-white">{me.data?.user.name ?? '…'}</p></div></div>
+        <InstallButton className="mb-1" />
         <button onClick={out} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-sidebar-fg hover:bg-white/10 hover:text-white"><LogOut className="size-4 rtl:-scale-x-100" />{t('common.signout')}</button>
       </div>
     </>
