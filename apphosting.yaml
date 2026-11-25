@@ -1,0 +1,34 @@
+# Firebase App Hosting config (project: smartclinic-eg-2026)
+# Create the three secrets once:  firebase apphosting:secrets:set DATABASE_URL  (and AUTH_SECRET, VAPID_PRIVATE_KEY)
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 1        # keeps the LISTEN/NOTIFY realtime connection warm
+  maxInstances: 4
+  concurrency: 80
+
+scripts:
+  buildCommand: npm run vercel-build   # runs DB migrations (when DATABASE_URL is available) then next build
+
+env:
+  - variable: PGSSL
+    value: require
+  - variable: APP_URL
+    value: https://smartclinic-eg-2026.web.app   # replace with your App Hosting URL / custom domain
+  - variable: VAPID_SUBJECT
+    value: mailto:admin@smartclinic.app
+  - variable: VAPID_PUBLIC_KEY
+    value: BF2Bhq1nhvU1JoFE_t6pIZYncOQoA6VJnYot6kWBaFTTLUqbKlxZMaxilyF181YQ5I48dH9v7FcbAfJY9tVsRz8
+  - variable: NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    value: BF2Bhq1nhvU1JoFE_t6pIZYncOQoA6VJnYot6kWBaFTTLUqbKlxZMaxilyF181YQ5I48dH9v7FcbAfJY9tVsRz8
+    availability: [BUILD, RUNTIME]
+  - variable: SEED_DEMO
+    value: "1"
+    availability: [BUILD]
+  - variable: DATABASE_URL
+    secret: DATABASE_URL
+    availability: [BUILD, RUNTIME]
+  - variable: AUTH_SECRET
+    secret: AUTH_SECRET
+  - variable: VAPID_PRIVATE_KEY
+    secret: VAPID_PRIVATE_KEY
