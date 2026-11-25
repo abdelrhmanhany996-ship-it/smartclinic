@@ -8,13 +8,14 @@ import { fmtTime } from '@/lib/i18n';
 import { notifText } from '@/lib/notiftext';
 import { toMin } from '@/lib/time';
 import { ago } from '@/lib/format';
+import { RecordTab } from './tracker-record';
 
 const b64 = (s: string) => { const p = '='.repeat((4 - (s.length % 4)) % 4); const r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...r].map((c) => c.charCodeAt(0))); };
 
 export default function Tracker({ token }: { token: string }) {
   const { t, locale } = usePrefs();
   const { data, error, connected, setData } = useLive<any>(`/api/track/${token}`, `/api/track/${token}/events`, { poll: 20000 });
-  const [tab, setTab] = useState<'queue' | 'notes'>('queue');
+  const [tab, setTab] = useState<'queue' | 'record' | 'notes'>('queue');
   const [banner, setBanner] = useState<{ id: number; kind: string; data: any } | null>(null);
   const seen = useRef<Set<number> | null>(null);
 
@@ -73,7 +74,7 @@ export default function Tracker({ token }: { token: string }) {
         <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3"><div className="min-w-0"><p className="truncate text-[15px] font-bold leading-tight">{clinicName}</p><p className="truncate text-xs opacity-85">{clinic.tagline}</p></div>
           <div className="flex items-center gap-1 [&_button]:!text-white [&_button:hover]:!bg-white/15"><PrefsToggles /></div></div>
         <div className="mx-auto flex max-w-md border-t border-white/20 text-sm font-semibold">
-          {([['queue', t('nav.queue')], ['notes', t('tr.notifications')]] as const).map(([k, l]) => <button key={k} onClick={() => (k === 'notes' ? openNotes() : setTab('queue'))} aria-pressed={tab === k} className={cx('relative flex-1 py-2.5 transition', tab === k ? 'text-white' : 'text-white/70')}>{l}{k === 'notes' && unread > 0 && <span className="ms-1.5 rounded-full bg-[#F5C451] px-1.5 text-[11px] font-bold text-[#102A43]">{unread}</span>}{tab === k && <span className="absolute inset-x-6 bottom-0 h-0.5 rounded bg-white" />}</button>)}</div>
+          {([['queue', t('nav.queue')], ['record', t('tr.record')], ['notes', t('tr.notifications')]] as const).map(([k, l]) => <button key={k} onClick={() => (k === 'notes' ? openNotes() : setTab(k))} aria-pressed={tab === k} className={cx('relative flex-1 py-2.5 transition', tab === k ? 'text-white' : 'text-white/70')}>{l}{k === 'notes' && unread > 0 && <span className="ms-1.5 rounded-full bg-[#F5C451] px-1.5 text-[11px] font-bold text-[#102A43]">{unread}</span>}{tab === k && <span className="absolute inset-x-6 bottom-0 h-0.5 rounded bg-white" />}</button>)}</div>
       </header>
 
       {banner && <button onClick={openNotes} className="slide-up fixed inset-x-3 top-24 z-40 mx-auto flex max-w-md items-start gap-3 rounded-2xl border border-line bg-card p-4 text-start shadow-2xl" role="alert">
@@ -125,7 +126,9 @@ export default function Tracker({ token }: { token: string }) {
             </div>
           </section>
           <p className="flex items-center justify-center gap-1.5 pt-2 text-center text-xs text-muted"><ShieldCheck className="size-3.5" />{t('tr.privacy')}</p>
-        </> : (
+        </> : tab === 'record' ? (
+          <RecordTab data={data} brand={brand} onNavigate={(tk) => { window.location.href = `/t/${tk}`; }} />
+        ) : (
           <section className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
             {data.notifications.length === 0 && <p className="p-8 text-center text-muted">{t('tr.noNotifs')}</p>}
             {data.notifications.map((n: any) => { const x = notifText(n.kind, n.data, locale); return (

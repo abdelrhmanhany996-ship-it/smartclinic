@@ -47,3 +47,12 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-sans);
 @keyframes sk { to { background-position: -200% 0; } }
 .scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; } .scroll-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
 .safe-b { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+
+/* Prescription printing: only #rx-print is visible on paper */
+#rx-print { display: none; }
+@media print {
+  body * { visibility: hidden !important; }
+  #rx-print, #rx-print * { visibility: visible !important; }
+  #rx-print { display: block !important; position: absolute; inset: 0; background: #fff; color: #000; padding: 18mm 16mm; font-size: 13px; }
+  @page { size: A5; margin: 0; }
+}

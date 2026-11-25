@@ -31,6 +31,7 @@ async function main() {
   const { j: cl } = await rec.req('/api/clinic');
   const sara = cl.doctors.find((d: any) => d.code.trim() === 'A');
   const today = cl.today;
+  await doc.req(`/api/doctors/${sara.id}`, { start: '00:00', end: '23:59', breakStart: null, breakEnd: null, workDays: [0, 1, 2, 3, 4, 5, 6] }, 'PATCH'); // slots available at any hour
 
   console.log('\n[1] Receptionist books an appointment');
   const slots = (await rec.req(`/api/slots?doctorId=${sara.id}&date=${today}`)).j.slots.filter((s: any) => s.available);
@@ -137,6 +138,32 @@ async function main() {
   const rs = await rec.req(`/api/appointments/${a4.id}/action`, { action: 'reschedule', date: day, time: s2[0].time }); const t4 = await track(a4.token);
   ok(rs.status === 200 && t4.appointment.time === s2[0].time && (await rec.req(`/api/appointments/${a4.id}/share`)).j.token === a4.token, 'reschedule keeps the same private link, new time + ticket');
   ok((await rec.req(`/api/appointments/${a1.id}/action`, { action: 'start' })).status === 409, 'illegal transition rejected');
+
+  console.log('\n[9b] Patient records & prescriptions');
+  const np = await rec.req('/api/patients', { fullName: 'Records Patient', phone: '01099887766', channel: 'whatsapp', birthDate: '1990-05-01', gender: 'female' });
+  ok(np.status === 200, 'reception adds a patient directly');
+  ok((await rec.req('/api/patients', { fullName: 'Dup', phone: '01099887766' })).status === 409, 'duplicate phone rejected');
+  const pid = np.j.id;
+  ok((await doc.req(`/api/patients/${pid}`, { allergies: 'Aspirin', chronic: 'Asthma', bloodType: 'A+' }, 'PATCH')).status === 200, 'doctor records allergies / chronic conditions');
+  ok((await rec.req(`/api/patients/${pid}`)).j.patient.allergies === undefined, 'reception cannot see medical fields');
+  ok((await doc.req(`/api/patients?q=Records`)).j.some((p: any) => p.id === pid), 'doctor can search patients');
+  ok((await rec.req(`/api/patients/${pid}/prescriptions`, { items: [], send: true, diagnosis: 'x' })).status === 403, 'reception cannot write prescriptions');
+  const rxBody = { diagnosis: 'Common cold', items: [{ name: 'Panadol', dose: '500mg', frequency: 'Every 8h', duration: '3 days' }], advice: 'Rest and fluids', followUpDate: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), send: true };
+  ok((await doc.req(`/api/patients/${pid}/prescriptions`, { items: [], send: true })).status === 422, 'empty prescription rejected');
+  const rx = await doc.req(`/api/patients/${pid}/prescriptions`, rxBody); ok(rx.status === 200, 'doctor saves & sends prescription');
+  const pb = (await rec.req('/api/appointments', { fullName: 'Records Patient', phone: '01099887766', date: day, time: s2[s2.length - 5].time, doctorId: sara.id, visitType: 'consultation', channel: 'whatsapp' })).j;
+  const pt = await track(pb.token);
+  ok(pt.record.prescriptions.length === 1 && pt.record.prescriptions[0].items[0].name === 'Panadol', 'patient app shows the full prescription');
+  ok(pt.record.followUps.length === 1 && pt.record.upcoming.length >= 1, 'patient app shows follow-up and upcoming appointments');
+  ok(pt.record.profile.allergies === 'Aspirin', 'patient sees own medical profile');
+  ok((await doc.req(`/api/prescriptions/${rx.j.id}/send`, {})).status === 200, 'doctor re-sends prescription to the patient app');
+  ok((await notes(pb.token)).includes('prescription'), 'patient notified of new prescription');
+  ok(!JSON.stringify(pt).includes('Sara Mostafa'), 'record view leaks no other patient');
+  const other0 = await new Client().login('reception@alnoor.demo', 'Demo@123');
+  ok((await other0.req(`/api/patients/${pid}`)).status === 404, 'other clinic cannot open this patient');
+  const doc2 = await new Client().login('laila@alnoor.demo', 'Demo@123');
+  ok((await doc2.req(`/api/patients/${pid}/prescriptions`)).j.length === 0, "other clinic's doctor cannot read these prescriptions");
+  ok((await doc2.req(`/api/prescriptions/${rx.j.id}/send`, {})).status === 404, "other clinic cannot send this prescription");
 
   console.log('\n[10] Multi-clinic isolation');
   const other = await new Client().login('reception@alnoor.demo', 'Demo@123');

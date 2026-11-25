@@ -8,6 +8,7 @@ import { addDays, clinicNow, fromMin, isDate, toMin } from './time';
 import { notifText } from './notiftext';
 import { confirmationMessage, normalizePhone, telegramUrl, whatsappUrl, Lang } from './messages';
 import type { Session } from './auth';
+import { patientRecord } from './records';
 
 export class HttpError extends Error { constructor(public status: number, msg: string) { super(msg); } }
 const bad = (m: string, s = 400) => new HttpError(s, m);
@@ -276,7 +277,7 @@ export async function doAction(s: Session, id: string, action: Action, p: { date
 /* ---------- patient tracking view (privacy-safe) ---------- */
 export async function trackView(token: string) {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) throw bad('Not found', 404);
-  const a = await q1<any>('select id, clinic_id, doctor_id, to_char(appt_date,\'YYYY-MM-DD\') d from appointments where token=$1', [token]);
+  const a = await q1<any>('select id, clinic_id, doctor_id, patient_id, to_char(appt_date,\'YYYY-MM-DD\') d from appointments where token=$1', [token]);
   if (!a) throw bad('Not found', 404);
   const clinic = await getClinic(a.clinic_id);
   const snap = await queueSnapshot(a.clinic_id, a.doctor_id, a.d);
@@ -292,6 +293,7 @@ export async function trackView(token: string) {
       ahead: live ? me.ahead : null, estimatedTime: me.estTime, now: snap.now, delayMin: me.delayMin, nowServing: serving?.ticket ?? null,
       totalWaiting: snap.items.filter((i) => i.status === 'booked' || i.status === 'checked_in').length, isToday: snap.date === clinicNow(clinic.timezone).date,
     },
+    record: await patientRecord(a.clinic_id, a.patient_id, clinicNow(clinic.timezone).date, a.id),
     notifications: notes, serverTime: Date.now(), pushKey: process.env.VAPID_PUBLIC_KEY || null,
   };
 }

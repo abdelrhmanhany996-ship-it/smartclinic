@@ -22,6 +22,7 @@ const NAV: Record<string, Item[]> = {
   ],
   doctor: [
     { href: '/doctor', key: 'nav.today', icon: <Stethoscope /> },
+    { href: '/doctor/patients', key: 'nav.patients', icon: <Users /> },
     { href: '/doctor/stats', key: 'nav.stats', icon: <BarChart3 /> },
     { href: '/doctor/schedule', key: 'nav.schedule', icon: <Settings /> },
   ],

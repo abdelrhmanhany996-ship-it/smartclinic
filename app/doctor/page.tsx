@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Hourglass, Play, Stethoscope, Timer, UserRound } from 'lucide-react';
+import Link from 'next/link';
+import { CheckCircle2, FileText, Hourglass, Play, Stethoscope, Timer, UserRound } from 'lucide-react';
 import { PageHeader } from '@/components/shell';
 import { Button, Card, CardHeader, Empty, LiveDot, Skeleton, StatTile, StatusChip, Time } from '@/components/ui';
 import { usePrefs } from '@/components/providers';
@@ -32,16 +33,16 @@ export default function DoctorHome() {
           <CardHeader title={t('dr.current')} right={current && <StatusChip status="in_consultation" />} />
           {!data ? <Skeleton className="m-5 h-32" /> : current ? <div className="p-6">
             <div className="flex items-center gap-4"><span className="grid size-16 place-items-center rounded-2xl bg-primary text-xl font-bold text-primary-fg">{current.ticket}</span>
-              <div><p className="text-2xl font-bold">{current.patient}</p><p className="text-sm text-muted">{t(`visit.${current.visitType}`)}</p></div></div>
+              <div><Link href={`/doctor/patients/${current.patientId}?appt=${current.id}`} className="text-2xl font-bold hover:text-primary hover:underline">{current.patient}</Link><p className="text-sm text-muted">{t(`visit.${current.visitType}`)}</p></div></div>
             <div className="mt-5 flex items-end justify-between"><div><p className="text-xs text-muted">{t('dr.elapsed')}</p><p className={`text-4xl font-bold tabular-nums ${over ? 'text-[var(--wait-fg)]' : ''}`}>{mm}:{ss}</p></div>
-              <Button size="lg" icon={<CheckCircle2 className="size-5" />} loading={busy === current.id + 'end'} onClick={() => run(current.id, 'end')}>{t('act.end')}</Button></div></div>
+              <div className="flex gap-2"><Link href={`/doctor/patients/${current.patientId}?appt=${current.id}`}><Button size="lg" variant="secondary" icon={<FileText className="size-5" />}>{t('dr.openRecord')}</Button></Link><Button size="lg" icon={<CheckCircle2 className="size-5" />} loading={busy === current.id + 'end'} onClick={() => run(current.id, 'end')}>{t('act.end')}</Button></div></div></div>
             : <Empty icon={<UserRound className="size-10" />} title={t('dr.noCurrent')} />}
         </Card>
         <Card>
           <CardHeader title={t('dr.next')} />
           {!data ? <Skeleton className="m-5 h-32" /> : next ? <div className="p-6">
             <div className="flex items-center gap-4"><span className="grid size-16 place-items-center rounded-2xl bg-primary-soft text-xl font-bold text-primary">{next.ticket}</span>
-              <div><p className="text-2xl font-bold">{next.patient}</p><p className="text-sm text-muted"><Time v={next.time} /> · {t(`status.${next.status}`)}{next.delayMin >= 5 && ` · +${next.delayMin} ${t('common.min')}`}</p></div></div>
+              <div><Link href={`/doctor/patients/${next.patientId}?appt=${next.id}`} className="text-2xl font-bold hover:text-primary hover:underline">{next.patient}</Link><p className="text-sm text-muted"><Time v={next.time} /> · {t(`status.${next.status}`)}{next.delayMin >= 5 && ` · +${next.delayMin} ${t('common.min')}`}</p></div></div>
             <div className="mt-5 flex justify-end"><Button size="lg" disabled={!!current} icon={<Play className="size-5" />} loading={busy === next.id + 'start'} onClick={() => run(next.id, 'start')}>{t('dr.startNext')}</Button></div></div>
             : <Empty icon={<UserRound className="size-10" />} title={t('dr.noNext')} />}
         </Card>
@@ -52,7 +53,7 @@ export default function DoctorHome() {
           {!data ? <Skeleton className="m-5 h-32" /> : items.length === 0 ? <Empty title={t('q.empty')} /> : items.map((i) => (
             <div key={i.id} className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3.5">
               <span className="w-20 font-semibold tabular-nums"><Time v={i.time} /></span><span className="w-16 font-bold">{i.ticket}</span>
-              <div className="min-w-40 flex-1"><p className="font-medium">{i.patient}</p><p className="text-xs text-muted">{t(`visit.${i.visitType}`)}{i.estTime && ` · ${t('q.est')} `}{i.estTime && <Time v={i.estTime} />}</p></div>
+              <div className="min-w-40 flex-1"><Link href={`/doctor/patients/${i.patientId}?appt=${i.id}`} className="font-medium hover:text-primary hover:underline">{i.patient}</Link><p className="text-xs text-muted">{t(`visit.${i.visitType}`)}{i.estTime && ` · ${t('q.est')} `}{i.estTime && <Time v={i.estTime} />}</p></div>
               <StatusChip status={i.status} />
               <div className="w-28 text-end">{['booked', 'checked_in'].includes(i.status) && <Button size="sm" variant="soft" disabled={!!current} icon={<Play className="size-4" />} onClick={() => run(i.id, 'start')}>{t('act.start')}</Button>}</div>
             </div>))}

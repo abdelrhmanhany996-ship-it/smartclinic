@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Search, UserPlus } from 'lucide-react';
+import { Plus, Search, UserPlus } from 'lucide-react';
+import { AddPatientModal } from '@/components/patient-form';
 import { PageHeader } from '@/components/shell';
 import { Button, Card, Empty, Input, Modal, Skeleton, StatusChip, Textarea, Time } from '@/components/ui';
 import { usePrefs } from '@/components/providers';
@@ -9,14 +10,16 @@ import { api, useLive } from '@/lib/client';
 
 export default function Patients() {
   const { t, toast } = usePrefs();
+  const [addOpen, setAddOpen] = useState(false);
   const [q, setQ] = useState(''); const [open, setOpen] = useState<string | null>(null);
-  const { data } = useLive<any[]>(`/api/patients?q=${encodeURIComponent(q)}`, null);
+  const { data, reload } = useLive<any[]>(`/api/patients?q=${encodeURIComponent(q)}`, null);
   const det = useLive<any>(open ? `/api/patients/${open}` : null, null);
   const [notes, setNotes] = useState<string | null>(null);
   const save = async () => { try { await api(`/api/patients/${open}`, { method: 'PATCH', body: { notes } }); toast(t('common.saved')); } catch (e: any) { toast(e.message, 'err'); } };
   return (
     <>
-      <PageHeader title={t('pt.title')} right={<div className="relative"><Search className="pointer-events-none absolute start-3 top-3 size-4 text-muted" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('common.search')} className="!w-64 ps-9" /></div>} />
+      <PageHeader title={t('pt.title')} right={<><Button icon={<Plus className="size-4" />} onClick={() => setAddOpen(true)}>{t('pt.addPatient')}</Button><div className="relative"><Search className="pointer-events-none absolute start-3 top-3 size-4 text-muted" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('common.search')} className="!w-64 ps-9" /></div></>} />
+      <AddPatientModal open={addOpen} onClose={() => setAddOpen(false)} onCreated={(id) => { setAddOpen(false); reload(); setOpen(id); setNotes(null); }} />
       <Card className="overflow-x-auto scroll-thin">
         <table className="w-full min-w-[700px] text-sm">
           <thead className="bg-surface text-xs uppercase tracking-wide text-muted"><tr>{['common.name', 'common.phone', 'pt.visits', 'pt.noShows', 'pt.last'].map((k) => <th key={k} className="px-4 py-3 text-start font-semibold">{t(k)}</th>)}<th /></tr></thead>

@@ -14,6 +14,7 @@ export function notifText(kind: string, d: D, lang: Lang): { title: string; body
     case 'rescheduled': return ar ? { title: 'تم تغيير الموعد', body: `موعدك الجديد ${d.date} - ${t(d, lang)} — رقم الدور ${d.ticket}` } : { title: 'Appointment rescheduled', body: `New time: ${d.date} at ${t(d, lang)} — queue number ${d.ticket}` };
     case 'skipped': return ar ? { title: 'تم تخطي دورك', body: 'لم تكن حاضراً عند ندائك. توجه للاستقبال لإعادة دورك.' } : { title: 'Your turn was skipped', body: 'You were not present when called. Please see the reception to rejoin.' };
     case 'no_show': return ar ? { title: 'لم تحضر', body: 'تم تسجيل الموعد كغياب.' } : { title: 'Marked as no-show', body: 'Your appointment was marked as missed.' };
+    case 'prescription': return ar ? { title: 'روشتة جديدة', body: `أرسل لك ${d.doctor ?? 'الطبيب'} روشتة جديدة. افتح "سجلي الطبي" للاطلاع عليها.` } : { title: 'New prescription', body: `${d.doctor ?? 'Your doctor'} sent you a new prescription. Open "My record" to view it.` };
     // staff
     case 'booked': return ar ? { title: 'حجز جديد', body: `${d.patient} — ${d.ticket} — ${t(d, lang)}` } : { title: 'New booking', body: `${d.patient} — ${d.ticket} — ${t(d, lang)}` };
     case 'checked_in': return ar ? { title: 'وصل المريض', body: `${d.patient} (${d.ticket})` } : { title: 'Patient arrived', body: `${d.patient} (${d.ticket}) checked in` };
