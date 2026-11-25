@@ -17,8 +17,8 @@ export function confirmationMessage(m: MsgInput) {
   const d = new Date(m.date + 'T12:00:00Z').toLocaleDateString(m.lang === 'ar' ? 'ar-EG' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
   const t = fmtTime12(m.time.slice(0, 5), m.lang);
   return m.lang === 'ar'
-    ? `مرحباً ${m.patient ?? ''} 👋\nتم تأكيد حجزك في *${m.clinic}*\n\n👨‍⚕️ الطبيب: ${m.doctor}\n📅 الموعد: ${d} - ${t}\n🎫 رقم الدور: ${m.ticket}\n\nتابع دورك لحظة بلحظة من بيتك بدون انتظار:\n${m.link}\n\nSmartClinic — انتظار أقل. رعاية أفضل.`
-    : `Hello ${m.patient ?? ''} 👋\nYour appointment at *${m.clinic}* is confirmed.\n\n👨‍⚕️ Doctor: ${m.doctor}\n📅 When: ${d} at ${t}\n🎫 Queue number: ${m.ticket}\n\nTrack your turn live from home — no waiting room needed:\n${m.link}\n\nSmartClinic — Less Waiting. Better Care.`;
+    ? `مرحباً ${m.patient ?? ''}،\nتم تأكيد حجزك في *${m.clinic}*\n\nالطبيب: ${m.doctor}\nالموعد: ${d} - ${t}\nرقم الدور: ${m.ticket}\n\nتابع دورك لحظة بلحظة من بيتك بدون انتظار:\n${m.link}\n\nSmartClinic — انتظار أقل. رعاية أفضل.`
+    : `Hello ${m.patient ?? ''},\nYour appointment at *${m.clinic}* is confirmed.\n\nDoctor: ${m.doctor}\nWhen: ${d} at ${t}\nQueue number: ${m.ticket}\n\nTrack your turn live from home — no waiting room needed:\n${m.link}\n\nSmartClinic — Less Waiting. Better Care.`;
 }
 export const whatsappUrl = (phone: string, text: string) => `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 export const telegramUrl = (link: string, text: string) => `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;

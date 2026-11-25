@@ -2,7 +2,7 @@
 import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, Plus, Printer, Send, Trash2, Pencil } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, MessageCircle, Plus, Printer, Send, Trash2, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/shell';
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Skeleton, StatusChip, Textarea, Time, cx } from '@/components/ui';
 import { Dictate } from '@/components/dictate';
@@ -52,12 +52,21 @@ function PatientRecord() {
   const resend = async (rxId: string) => { try { await api(`/api/prescriptions/${rxId}/send`, { body: {} }); toast(t('rx.sent')); reload(); } catch (e: any) { toast(e.message, 'err'); } };
   const saveProfile = async () => { try { await api(`/api/patients/${id}`, { method: 'PATCH', body: { fullName: edit.fullName, phone: edit.phone, channel: edit.channel, birthDate: edit.birthDate || null, gender: edit.gender || null, allergies: edit.allergies || null, chronic: edit.chronic || null, bloodType: edit.bloodType || null, notes: edit.notes || null } }); setEdit(null); await reload(); toast(t('common.saved')); const last = (await api<any>(`/api/patients/${id}`)).visits.find((v: any) => ['booked', 'checked_in', 'in_consultation', 'skipped'].includes(v.status)) ?? null; if (last) setSendId(last.id); } catch (e: any) { toast(e.message, 'err'); } };
   const age = useMemo(() => ageOf(p?.birthDate), [p]);
+  /** Opens the patient's WhatsApp chat; with an active booking the message already carries the private app link. */
+  const openWhatsApp = async () => {
+    const win = window.open('about:blank', '_blank'); // opened inside the click so the browser does not block it
+    try {
+      const live = data.visits.find((v: any) => ['booked', 'checked_in', 'in_consultation', 'skipped'].includes(v.status));
+      const url = live ? (await api<any>(`/api/appointments/${live.id}/share`)).whatsappUrl : `https://wa.me/${p.phone.replace(/\D/g, '')}`;
+      if (win) win.location.href = url; else window.location.href = url;
+    } catch (e: any) { win?.close(); toast(e.message, 'err'); }
+  };
 
   if (!data) return <Skeleton className="h-96" />;
   return (
     <>
       <Link href="/doctor/patients" className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" />{t('dr.back')}</Link>
-      <PageHeader title={p.fullName} sub={`${p.phone}${age != null ? ` · ${age} ${t('pt.years')}` : ''}${p.gender ? ` · ${t(`pt.${p.gender}`)}` : ''}`} right={<Button variant="secondary" icon={<Pencil className="size-4" />} onClick={() => setEdit({ fullName: p.fullName, phone: p.phone, channel: p.channel ?? 'whatsapp', birthDate: p.birthDate ?? '', gender: p.gender ?? '', bloodType: p.bloodType ?? '', allergies: p.allergies ?? '', chronic: p.chronic ?? '', notes: p.notes ?? '' })}>{t('pt.editProfile')}</Button>} />
+      <PageHeader title={p.fullName} sub={`${p.phone}${age != null ? ` · ${age} ${t('pt.years')}` : ''}${p.gender ? ` · ${t(`pt.${p.gender}`)}` : ''}`} right={<><a href={`https://wa.me/${p.phone.replace(/\D/g, '')}`} onClick={(e) => { e.preventDefault(); openWhatsApp(); }} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#25D366] px-4 text-sm font-semibold text-[#06361b] transition hover:brightness-105"><MessageCircle className="size-4" />{t('act.whatsapp')}</a><Button variant="secondary" icon={<Pencil className="size-4" />} onClick={() => setEdit({ fullName: p.fullName, phone: p.phone, channel: p.channel ?? 'whatsapp', birthDate: p.birthDate ?? '', gender: p.gender ?? '', bloodType: p.bloodType ?? '', allergies: p.allergies ?? '', chronic: p.chronic ?? '', notes: p.notes ?? '' })}>{t('pt.editProfile')}</Button></>} />
 
       {cur && <Card className="mb-5 border-primary/50"><div className="flex flex-wrap items-center gap-3 px-5 py-4"><span className="rounded-lg bg-primary px-3 py-1 text-lg font-bold text-primary-fg">{cur.ticket}</span><div className="flex-1"><p className="font-semibold">{t('dr.currentVisit')}</p><p className="text-sm text-muted"><Time v={cur.time} /> · {t(`visit.${cur.visitType}`)}</p></div><StatusChip status={cur.status} />
         {cur.status === 'in_consultation' ? <Button icon={<CheckCircle2 className="size-4" />} loading={busy === cur.id + 'end'} onClick={() => run(cur.id, 'end')}>{t('act.end')}</Button>
