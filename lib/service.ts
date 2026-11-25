@@ -179,10 +179,8 @@ export async function createAppointment(s: Session, input: NewAppt) {
   if (!isDate(input.date) || !/^\d{2}:\d{2}$/.test(input.time)) throw bad('Invalid date/time');
   const phone = normalizePhone(input.phone, clinic.settings.country_code);
   if (phone.length < 8 || phone.length > 15) throw bad('Invalid phone number');
-  const slots = await listSlots(clinicId, input.doctorId, input.date);
-  const slot = slots.slots.find((x) => x.time === input.time);
-  if (!slot) throw bad('Selected time is outside doctor working hours');
-  if (!slot.available) throw bad(slot.reason === 'booked' ? 'This slot is already booked' : slot.reason === 'past' ? 'This time has passed' : 'Doctor is on break', 409);
+  // any minute is allowed (typed time) as long as it is inside working hours, not on break, not past, and not already full
+  await assertTimeFree(clinic, doc, input.date, input.time, '00000000-0000-0000-0000-000000000000');
 
   const appt = await tx(async (c) => {
     await c.query('select pg_advisory_xact_lock(hashtext($1))', [input.doctorId + input.date]);
