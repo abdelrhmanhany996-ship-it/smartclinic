@@ -11,7 +11,7 @@ import { RxPrint, ageOf, rxLabels, RxPrintData } from '@/components/rx-print';
 import { usePrefs } from '@/components/providers';
 import { api, useLive } from '@/lib/client';
 import { useClinic } from '@/components/useClinic';
-import { useActions } from '@/components/queue-parts';
+import { ShareModal, useActions } from '@/components/queue-parts';
 
 const emptyItem = () => ({ name: '', dose: '', frequency: '', duration: '', notes: '' });
 
@@ -29,6 +29,7 @@ function PatientRecord() {
   const [printing, setPrinting] = useState<RxPrintData | null>(null); const [edit, setEdit] = useState<any>(null);
   const setItem = (i: number, k: string, v: string) => setItems((x) => x.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const append = (setter: (f: (x: string) => string) => void) => (txt: string) => setter((x) => (x ? x.replace(/\s*$/, ' ') : '') + txt);
+  const [sendId, setSendId] = useState<string | null>(null);
   const p = data?.patient;
 
   const printData = (rx: any): RxPrintData => ({ clinicName: clinic.data?.clinic.name ?? '', clinicAddress: clinic.data?.clinic.address, clinicPhone: clinic.data?.clinic.phone, brandColor: clinic.data?.clinic.brand_color,
@@ -49,7 +50,7 @@ function PatientRecord() {
   };
   const me = useLive<any>('/api/auth/me', null).data?.user;
   const resend = async (rxId: string) => { try { await api(`/api/prescriptions/${rxId}/send`, { body: {} }); toast(t('rx.sent')); reload(); } catch (e: any) { toast(e.message, 'err'); } };
-  const saveProfile = async () => { try { await api(`/api/patients/${id}`, { method: 'PATCH', body: { fullName: edit.fullName, phone: edit.phone, channel: edit.channel, birthDate: edit.birthDate || null, gender: edit.gender || null, allergies: edit.allergies || null, chronic: edit.chronic || null, bloodType: edit.bloodType || null, notes: edit.notes || null } }); setEdit(null); reload(); toast(t('common.saved')); } catch (e: any) { toast(e.message, 'err'); } };
+  const saveProfile = async () => { try { await api(`/api/patients/${id}`, { method: 'PATCH', body: { fullName: edit.fullName, phone: edit.phone, channel: edit.channel, birthDate: edit.birthDate || null, gender: edit.gender || null, allergies: edit.allergies || null, chronic: edit.chronic || null, bloodType: edit.bloodType || null, notes: edit.notes || null } }); setEdit(null); await reload(); toast(t('common.saved')); const last = (await api<any>(`/api/patients/${id}`)).visits.find((v: any) => ['booked', 'checked_in', 'in_consultation', 'skipped'].includes(v.status)) ?? null; if (last) setSendId(last.id); } catch (e: any) { toast(e.message, 'err'); } };
   const age = useMemo(() => ageOf(p?.birthDate), [p]);
 
   if (!data) return <Skeleton className="h-96" />;
@@ -133,6 +134,7 @@ function PatientRecord() {
       <Modal open={!!edit} onClose={() => setEdit(null)} title={t('pt.editProfile')} wide>{edit && <form className="grid gap-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); saveProfile(); }}>
         <PatientFields v={edit} set={(k, val) => setEdit((x: any) => ({ ...x, [k]: val }))} medical />
         <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="secondary" onClick={() => setEdit(null)}>{t('common.cancel')}</Button><Button type="submit" disabled={edit.fullName.trim().length < 2 || edit.phone.replace(/\D/g, '').length < 8}>{t('common.save')}</Button></div></form>}</Modal>
+      <ShareModal id={sendId} onClose={() => setSendId(null)} title={t('send.after')} />
       <RxPrint data={printing} labels={rxLabels(t)} dir={dir} />
     </>
   );

@@ -40,6 +40,7 @@ export const ACTION_ICON: Record<string, ReactNode> = {
 export function RowActions({ it, doctorId, run, busy, onShare, role = 'receptionist', labeled }: { it: QItem; doctorId: string; run: (id: string, a: string, x?: object) => Promise<boolean>; busy: string | null; onShare?: (id: string) => void; role?: string; labeled?: boolean }) {
   const { t } = usePrefs();
   const [resched, setResched] = useState(false);
+  const [sendId, setSendId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<null | { action: string; msg: string }>(null);
   const acts = role === 'doctor' ? actionsFor(it.status).filter((a) => ['start', 'end', 'reschedule', 'cancel', 'no_show'].includes(a)) : actionsFor(it.status);
   const primary = acts.filter((a) => ['check_in', 'start', 'end', 'recall'].includes(a));
@@ -61,7 +62,8 @@ export function RowActions({ it, doctorId, run, busy, onShare, role = 'reception
         <div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setConfirm(null)}>{t('common.no')}</Button>
           <Button variant="danger" onClick={async () => { const a = confirm!.action; setConfirm(null); await run(it.id, a); }}>{t('common.yes')}</Button></div>
       </Modal>
-      {resched && <Reschedule it={it} doctorId={doctorId} lockDoctor={role === 'doctor'} onClose={() => setResched(false)} onSave={async (b) => { if (await run(it.id, 'reschedule', b)) setResched(false); }} />}
+      {resched && <Reschedule it={it} doctorId={doctorId} lockDoctor={role === 'doctor'} onClose={() => setResched(false)} onSave={async (b) => { if (await run(it.id, 'reschedule', b)) { setResched(false); if (role !== 'noSend') setSendId(it.id); } }} />}
+      <ShareModal id={sendId} onClose={() => setSendId(null)} title={t('send.after')} />
     </div>
   );
 }
@@ -92,7 +94,7 @@ function Reschedule({ it, doctorId, lockDoctor, onClose, onSave }: { it: QItem; 
   );
 }
 
-export function ShareModal({ id, onClose }: { id: string | null; onClose: () => void }) {
+export function ShareModal({ id, onClose, title }: { id: string | null; onClose: () => void; title?: string }) {
   const { t, toast, locale } = usePrefs();
   const [lang, setLang] = useState<string>(locale);
   const [d, setD] = useState<any>(null);
@@ -100,8 +102,8 @@ export function ShareModal({ id, onClose }: { id: string | null; onClose: () => 
   const change = (l: string) => { setLang(l); api(`/api/appointments/${id}/share?lang=${l}`).then(setD); };
   const copy = async () => { try { await navigator.clipboard.writeText(d.link); } catch { const i = document.createElement('input'); i.value = d.link; document.body.appendChild(i); i.select(); document.execCommand('copy'); i.remove(); } toast(t('common.copied')); };
   return (
-    <Modal open={!!id} onClose={onClose} title={t('q.sendLink')} wide>
-      {!d ? <p className="text-sm text-muted">{t('common.loading')}</p> : <ShareBody d={d} lang={lang} change={change} copy={copy} />}
+    <Modal open={!!id} onClose={onClose} title={title ?? t('q.sendLink')} wide>
+      {!d ? <p className="text-sm text-muted">{t('common.loading')}</p> : <><ShareBody d={d} lang={lang} change={change} copy={copy} />{title && <div className="mt-4 flex justify-end"><Button variant="secondary" onClick={onClose}>{t('send.skip')}</Button></div>}</>}
     </Modal>
   );
 }
