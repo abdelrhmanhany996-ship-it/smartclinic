@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, MessageCircle, Plus, 
 import { PageHeader } from '@/components/shell';
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Skeleton, StatusChip, Textarea, Time, cx } from '@/components/ui';
 import { Dictate } from '@/components/dictate';
-import { PatientFields } from '@/components/patient-fields';
+import { AddPatientModal } from '@/components/patient-form';
 import { RxPrint, ageOf, rxLabels, RxPrintData } from '@/components/rx-print';
 import { usePrefs } from '@/components/providers';
 import { api, useLive } from '@/lib/client';
@@ -26,7 +26,7 @@ function PatientRecord() {
 
   const [dx, setDx] = useState(''); const [items, setItems] = useState([emptyItem()]); const [advice, setAdvice] = useState(''); const [follow, setFollow] = useState('');
   const [dictLang, setDictLang] = useState(locale === 'ar' ? 'ar-EG' : 'en-US'); const [saving, setSaving] = useState<null | 'print' | 'send'>(null);
-  const [printing, setPrinting] = useState<RxPrintData | null>(null); const [edit, setEdit] = useState<any>(null);
+  const [printing, setPrinting] = useState<RxPrintData | null>(null); const [edit, setEdit] = useState(false);
   const setItem = (i: number, k: string, v: string) => setItems((x) => x.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const append = (setter: (f: (x: string) => string) => void) => (txt: string) => setter((x) => (x ? x.replace(/\s*$/, ' ') : '') + txt);
   const [sendId, setSendId] = useState<string | null>(null);
@@ -50,8 +50,9 @@ function PatientRecord() {
   };
   const me = useLive<any>('/api/auth/me', null).data?.user;
   const resend = async (rxId: string) => { try { await api(`/api/prescriptions/${rxId}/send`, { body: {} }); toast(t('rx.sent')); reload(); } catch (e: any) { toast(e.message, 'err'); } };
-  const saveProfile = async () => { try { await api(`/api/patients/${id}`, { method: 'PATCH', body: { fullName: edit.fullName, phone: edit.phone, channel: edit.channel, birthDate: edit.birthDate || null, gender: edit.gender || null, allergies: edit.allergies || null, chronic: edit.chronic || null, bloodType: edit.bloodType || null, notes: edit.notes || null } }); setEdit(null); await reload(); toast(t('common.saved')); const last = (await api<any>(`/api/patients/${id}`)).visits.find((v: any) => ['booked', 'checked_in', 'in_consultation', 'skipped'].includes(v.status)) ?? null; if (last) setSendId(last.id); } catch (e: any) { toast(e.message, 'err'); } };
   const age = useMemo(() => ageOf(p?.birthDate), [p]);
+  const LIVE = ['booked', 'checked_in', 'in_consultation', 'skipped'];
+  const liveAppt = useMemo(() => { const v: any[] = data?.visits ?? []; return v.find((x) => x.id === apptId && LIVE.includes(x.status)) ?? v.find((x) => LIVE.includes(x.status)) ?? null; }, [data, apptId]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Opens the patient's WhatsApp chat; with an active booking the message already carries the private app link. */
   const openWhatsApp = async () => {
     const win = window.open('about:blank', '_blank'); // opened inside the click so the browser does not block it
@@ -66,7 +67,7 @@ function PatientRecord() {
   return (
     <>
       <Link href="/doctor/patients" className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" />{t('dr.back')}</Link>
-      <PageHeader title={p.fullName} sub={`${p.phone}${age != null ? ` · ${age} ${t('pt.years')}` : ''}${p.gender ? ` · ${t(`pt.${p.gender}`)}` : ''}`} right={<><a href={`https://wa.me/${p.phone.replace(/\D/g, '')}`} onClick={(e) => { e.preventDefault(); openWhatsApp(); }} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#25D366] px-4 text-sm font-semibold text-[#06361b] transition hover:brightness-105"><MessageCircle className="size-4" />{t('act.whatsapp')}</a><Button variant="secondary" icon={<Pencil className="size-4" />} onClick={() => setEdit({ fullName: p.fullName, phone: p.phone, channel: p.channel ?? 'whatsapp', birthDate: p.birthDate ?? '', gender: p.gender ?? '', bloodType: p.bloodType ?? '', allergies: p.allergies ?? '', chronic: p.chronic ?? '', notes: p.notes ?? '' })}>{t('pt.editProfile')}</Button></>} />
+      <PageHeader title={p.fullName} sub={`${p.phone}${age != null ? ` · ${age} ${t('pt.years')}` : ''}${p.gender ? ` · ${t(`pt.${p.gender}`)}` : ''}`} right={<><a href={`https://wa.me/${p.phone.replace(/\D/g, '')}`} onClick={(e) => { e.preventDefault(); openWhatsApp(); }} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#25D366] px-4 text-sm font-semibold text-[#06361b] transition hover:brightness-105"><MessageCircle className="size-4" />{t('act.whatsapp')}</a><Button variant="secondary" icon={<Pencil className="size-4" />} onClick={() => setEdit(true)}>{t('pt.editProfile')}</Button></>} />
 
       {cur && <Card className="mb-5 border-primary/50"><div className="flex flex-wrap items-center gap-3 px-5 py-4"><span className="rounded-lg bg-primary px-3 py-1 text-lg font-bold text-primary-fg">{cur.ticket}</span><div className="flex-1"><p className="font-semibold">{t('dr.currentVisit')}</p><p className="text-sm text-muted"><Time v={cur.time} /> · {t(`visit.${cur.visitType}`)}</p></div><StatusChip status={cur.status} />
         {cur.status === 'in_consultation' ? <Button icon={<CheckCircle2 className="size-4" />} loading={busy === cur.id + 'end'} onClick={() => run(cur.id, 'end')}>{t('act.end')}</Button>
@@ -140,9 +141,8 @@ function PatientRecord() {
         </div>
       </div>
 
-      <Modal open={!!edit} onClose={() => setEdit(null)} title={t('pt.editProfile')} wide>{edit && <form className="grid gap-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); saveProfile(); }}>
-        <PatientFields v={edit} set={(k, val) => setEdit((x: any) => ({ ...x, [k]: val }))} medical />
-        <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="secondary" onClick={() => setEdit(null)}>{t('common.cancel')}</Button><Button type="submit" disabled={edit.fullName.trim().length < 2 || edit.phone.replace(/\D/g, '').length < 8}>{t('common.save')}</Button></div></form>}</Modal>
+      <AddPatientModal medical open={edit} onClose={() => setEdit(false)} doctors={clinic.data?.doctors ?? []} myDoctorId={me?.doctorId} today={clinic.data?.today ?? new Date().toISOString().slice(0, 10)} onCreated={() => { reload(); appt.reload(); }}
+        edit={{ patientId: id, values: { fullName: p.fullName, phone: p.phone, channel: p.channel ?? 'whatsapp', birthDate: p.birthDate ?? '', gender: p.gender ?? '', bloodType: p.bloodType ?? '', allergies: p.allergies ?? '', chronic: p.chronic ?? '', notes: p.notes ?? '' }, appt: liveAppt }} />
       <ShareModal id={sendId} onClose={() => setSendId(null)} title={t('send.after')} />
       <RxPrint data={printing} labels={rxLabels(t)} dir={dir} />
     </>

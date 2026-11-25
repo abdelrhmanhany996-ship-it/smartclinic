@@ -102,7 +102,7 @@ export async function queueSnapshot(clinicId: string, doctorId: string, date: st
     return {
       id: r.id, ticket: r.ticket_code, patient: r.full_name, phone: r.phone, patientId: r.patient_id, time: r.t, status: r.status as Status,
       visitType: r.visit_type, reason: r.reason, channel: r.channel, token: r.token, checkedInAt: r.checked_in_at, startedAt: r.started_at, endedAt: r.ended_at,
-      ahead: e?.ahead ?? null, estTime: live && LIVE.includes(r.status) ? fromMin(e?.estStartMin ?? scheduledMin) : null, delayMin: e?.delayMin ?? 0,
+      ahead: e?.ahead ?? null, estTime: live && LIVE.includes(r.status) ? fromMin(e?.estStartMin ?? scheduledMin) : null, estMin: live && LIVE.includes(r.status) ? (e?.estStartMin ?? scheduledMin) : null, delayMin: e?.delayMin ?? 0,
       durationMin: durationFor(avg, r.visit_type, vt),
     };
   });
@@ -151,7 +151,7 @@ export async function afterChange(clinicId: string, doctorId: string, dates: str
         continue;
       }
       maxDelay = Math.max(maxDelay, it.delayMin);
-      const est = toMin(it.estTime!);
+      const est = it.estMin!; // numeric minutes: estimates past midnight must not wrap around
       const prev = row.notified_est ?? toMin(it.time);
       if (Math.abs(est - prev) >= dth) {
         const later = est > prev;
@@ -298,6 +298,18 @@ export async function doAction(s: Session, id: string, action: Action, p: { date
     const recent = await q1<any>(`select 1 from notifications where clinic_id=$1 and audience='staff' and kind='delay_alert' and created_at > now() - interval '20 minutes' and data->>'doctor'=$2`, [clinicId, d.name]);
     if (!recent) await notifyStaff(clinicId, 'delay_alert', { doctor: d.name, delay }, null);
   }
+  return { ok: true };
+}
+
+/** Edit visit type / details of a live appointment (reception, or the doctor who owns it). */
+export async function updateVisitDetails(s: Session, id: string, d: { visitType?: string; reason?: string | null }) {
+  const a = await q1<any>(`select a.*, to_char(a.appt_date,'YYYY-MM-DD') dd from appointments a where a.id=$1 and a.clinic_id=$2`, [id, s.clinicId]);
+  if (!a) throw bad('Appointment not found', 404);
+  if (s.role === 'doctor' && a.doctor_id !== s.doctorId) throw bad('Not your patient', 403);
+  if (!['booked', 'checked_in', 'in_consultation', 'skipped'].includes(a.status)) throw bad('This appointment can no longer be edited', 409);
+  await q(`update appointments set visit_type=coalesce($2,visit_type), reason=case when $4 then $3 else reason end where id=$1`, [id, d.visitType ?? null, d.reason ?? null, d.reason !== undefined]);
+  await audit(s, 'appointment.update', 'appointment', id, { visitType: d.visitType, reason: d.reason !== undefined });
+  await afterChange(s.clinicId!, a.doctor_id, [a.dd], 'updated'); // visit type changes the expected duration
   return { ok: true };
 }
 

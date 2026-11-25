@@ -28,7 +28,11 @@ async function main() {
   console.log('SmartClinic E2E →', BASE);
   const rec = await new Client().login('reception@nilecare.demo', 'Demo@123');
   const doc = await new Client().login('sara@nilecare.demo', 'Demo@123');
-  await rec.req('/api/clinic', { timezone: 'America/Los_Angeles' }, 'PATCH'); // keep the test independent of the time of day
+  // keep the test independent of the time of day: use a zone that has the same calendar date as Cairo but a daytime clock
+  const loc = (tz: string) => { const x = new Intl.DateTimeFormat('en-CA', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date()); const g = (k: string) => x.find((y) => y.type === k)!.value; return { date: `${g('year')}-${g('month')}-${g('day')}`, min: Number(g('hour')) * 60 + Number(g('minute')) }; };
+  const cairo = loc('Africa/Cairo');
+  const tzPick = ['Africa/Cairo', 'Europe/London', 'America/Sao_Paulo', 'America/New_York', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Tokyo', 'Pacific/Auckland'].find((z) => { const l = loc(z); return l.date === cairo.date && l.min >= 60 && l.min <= 1200; }) ?? 'Africa/Cairo';
+  await rec.req('/api/clinic', { timezone: tzPick }, 'PATCH');
   const { j: cl } = await rec.req('/api/clinic');
   const sara = cl.doctors.find((d: any) => d.code.trim() === 'A');
   const today = cl.today;
@@ -85,7 +89,7 @@ async function main() {
 
   console.log('\n[5] Smart delay management');
   const t0 = (await track(token)).queue.estimatedTime;
-  ok((await doc.req(`/api/doctors/${sara.id}`, { avg: 45 }, 'PATCH')).status === 200, 'doctor sets avg consultation to 45 min (consultations run long)');
+  ok((await doc.req(`/api/doctors/${sara.id}`, { avg: 180 }, 'PATCH')).status === 200, 'doctor sets avg consultation to 180 min (consultations run very long)');
   await sleep(500);
   const v2 = await track(token);
   const mins = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3));
@@ -131,6 +135,9 @@ async function main() {
     const tv = await track(dreg.j.token); ok(tv.appointment.reason === 'Chest X-ray, bring old films' && tv.appointment.visitType === 'xray', 'visit details (X-ray note) saved and visible in patient app');
     ok((await doc.req(`/api/appointments/${dreg.j.id}/action`, { action: 'reschedule', date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), time: '10:07' })).status === 200, 'doctor postpones with a typed time (10:07)');
     ok((await track(dreg.j.token)).appointment.time === '10:07', 'patient app shows the new typed time');
+    ok((await doc.req(`/api/appointments/${dreg.j.id}`, { visitType: 'lab', reason: 'Updated from the edit dialog' }, 'PATCH')).status === 200, 'edit dialog: doctor updates visit type and details of the active visit');
+    const tv2 = await track(dreg.j.token); ok(tv2.appointment.reason === 'Updated from the edit dialog' && tv2.appointment.visitType === 'lab', 'patient app shows the updated visit details');
+    ok((await doc.req(`/api/appointments/${oq.id}`, { reason: 'x' }, 'PATCH')).status === 403, "doctor cannot edit another doctor's visit");
     ok((await doc.req(`/api/appointments/${dreg.j.id}/action`, { action: 'reschedule', time: '23:59' })).status === 409, 'typed time outside working hours is rejected');
     ok((await doc.req(`/api/appointments/${dreg.j.id}/action`, { action: 'cancel' })).status === 200 && (await track(dreg.j.token)).appointment.status === 'cancelled', 'doctor cancels the booking');
   }

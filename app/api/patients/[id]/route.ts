@@ -8,7 +8,7 @@ import { normalizePhone } from '@/lib/messages';
 export const GET = route<{ id: string }>(STAFF, async ({ user, params }) => {
   const p = await q1<any>(`select id, full_name "fullName", phone, channel, notes, gender, to_char(birth_date,'YYYY-MM-DD') "birthDate", allergies, chronic_conditions chronic, blood_type "bloodType" from patients where id=$1 and clinic_id=$2`, [params.id, user.clinicId]);
   if (!p) throw new HttpError(404, 'Patient not found');
-  const visits = await q(`select a.id, a.ticket_code ticket, a.status, a.visit_type "visitType", to_char(a.appt_date,'YYYY-MM-DD') date, to_char(a.appt_time,'HH24:MI') time, d.name doctor
+  const visits = await q(`select a.id, a.ticket_code ticket, a.status, a.visit_type "visitType", a.reason, a.doctor_id "doctorId", to_char(a.appt_date,'YYYY-MM-DD') date, to_char(a.appt_time,'HH24:MI') time, d.name doctor
     from appointments a join doctors d on d.id=a.doctor_id where a.patient_id=$1 and a.clinic_id=$2 order by a.appt_date desc, a.appt_time desc limit 100`, [params.id, user.clinicId]);
   // medical content is for doctors only; reception sees demographics + visits
   if (user.role === 'doctor') { await audit(user, 'patient.view', 'patient', params.id); return { patient: p, visits, prescriptions: await listPrescriptions(user.clinicId!, params.id) }; }
