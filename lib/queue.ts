@@ -38,6 +38,8 @@ export const VISIT_TYPES = [
   { key: 'follow_up', en: 'Follow-up', ar: 'متابعة', factor: 0.7 },
   { key: 'checkup', en: 'Check-up', ar: 'فحص شامل', factor: 1.4 },
   { key: 'procedure', en: 'Procedure', ar: 'إجراء', factor: 2 },
+  { key: 'xray', en: 'X-ray', ar: 'أشعة', factor: 0.5 },
+  { key: 'lab', en: 'Lab test', ar: 'تحليل', factor: 0.3 },
 ] as const;
 
 export const DEFAULT_SETTINGS = {

@@ -17,6 +17,8 @@ export async function getClinic(clinicId: string) {
   const c = await q1<any>('select * from clinics where id=$1', [clinicId]);
   if (!c) throw bad('Clinic not found', 404);
   c.settings = { ...DEFAULT_SETTINGS, ...(c.settings || {}) };
+  const stored: any[] = Array.isArray(c.settings.visit_types) ? c.settings.visit_types : [];
+  c.settings.visit_types = [...DEFAULT_SETTINGS.visit_types, ...stored.filter((v) => !DEFAULT_SETTINGS.visit_types.some((d) => d.key === v.key))];
   return c;
 }
 export async function audit(s: Pick<Session, 'uid'> & { clinicId: string | null }, action: string, entity: string, entityId: string | null, meta: object = {}, c?: PoolClient) {
@@ -54,6 +56,30 @@ export async function listSlots(clinicId: string, doctorId: string, date: string
   return { slots, dayOff: false };
 }
 
+/** Free-typed time: inside working hours, not in the break, not in the past, and the exact minute not already full. */
+async function assertTimeFree(clinic: any, doc: any, date: string, time: string, excludeId: string) {
+  if (!isDate(date) || !/^\d{2}:\d{2}$/.test(time)) throw bad('Invalid date/time');
+  const dow = new Date(date + 'T12:00:00Z').getUTCDay(); const m = toMin(time);
+  if (!doc.work_days.includes(dow)) throw bad('Doctor is off on this day', 409);
+  if (m < toMin(doc.work_start) || m >= toMin(doc.work_end)) throw bad(`Outside working hours (${doc.work_start.slice(0, 5)}–${doc.work_end.slice(0, 5)})`, 409);
+  if (doc.break_start && doc.break_end && m >= toMin(doc.break_start) && m < toMin(doc.break_end)) throw bad('Doctor is on break at this time', 409);
+  const now = clinicNow(clinic.timezone);
+  if (date < now.date || (date === now.date && m < now.min - 5)) throw bad('This time has passed', 409);
+  const n = await q1<any>(`select count(*)::int n from appointments where doctor_id=$1 and appt_date=$2 and appt_time=$3 and id<>$4 and status in ('booked','checked_in','in_consultation','completed','skipped')`, [doc.id, date, time, excludeId]);
+  if (n.n >= (clinic.settings.slot_capacity ?? 1)) throw bad('This time is already booked', 409);
+}
+
+/** Add-patient flow: book the visit; when no time is given, take the first free slot of that day. */
+export async function registerVisit(s: Session, input: Omit<NewAppt, 'time'> & { time?: string | null }) {
+  let time = input.time;
+  if (!time) {
+    const { slots } = await listSlots(s.clinicId!, input.doctorId, input.date);
+    time = slots.find((x) => x.available)?.time;
+    if (!time) throw bad('No free time on this date. Pick another date.', 409);
+  }
+  return createAppointment(s, { ...input, time });
+}
+
 /* ---------- queue snapshot ---------- */
 export async function queueSnapshot(clinicId: string, doctorId: string, date: string) {
   const clinic = await getClinic(clinicId);
@@ -73,7 +99,7 @@ export async function queueSnapshot(clinicId: string, doctorId: string, date: st
     const scheduledMin = toMin(r.t);
     return {
       id: r.id, ticket: r.ticket_code, patient: r.full_name, phone: r.phone, patientId: r.patient_id, time: r.t, status: r.status as Status,
-      visitType: r.visit_type, channel: r.channel, token: r.token, checkedInAt: r.checked_in_at, startedAt: r.started_at, endedAt: r.ended_at,
+      visitType: r.visit_type, reason: r.reason, channel: r.channel, token: r.token, checkedInAt: r.checked_in_at, startedAt: r.started_at, endedAt: r.ended_at,
       ahead: e?.ahead ?? null, estTime: live && LIVE.includes(r.status) ? fromMin(e?.estStartMin ?? scheduledMin) : null, delayMin: e?.delayMin ?? 0,
       durationMin: durationFor(avg, r.visit_type, vt),
     };
@@ -143,7 +169,7 @@ export async function afterChange(clinicId: string, doctorId: string, dates: str
 }
 
 /* ---------- booking ---------- */
-export interface NewAppt { fullName: string; phone: string; date: string; time: string; doctorId: string; visitType: string; channel: 'whatsapp' | 'telegram' | 'link'; patientId?: string }
+export interface NewAppt { fullName: string; phone: string; date: string; time: string; doctorId: string; visitType: string; channel: 'whatsapp' | 'telegram' | 'link'; patientId?: string; birthDate?: string | null; gender?: 'male' | 'female' | null; reason?: string | null }
 
 export async function createAppointment(s: Session, input: NewAppt) {
   const clinicId = s.clinicId!;
@@ -163,15 +189,16 @@ export async function createAppointment(s: Session, input: NewAppt) {
     const clash = await c.query(`select count(*)::int n from appointments where doctor_id=$1 and appt_date=$2 and appt_time=$3 and status in ('booked','checked_in','in_consultation','completed','skipped')`, [input.doctorId, input.date, input.time]);
     if (clash.rows[0].n >= (clinic.settings.slot_capacity ?? 1)) throw bad('This slot is already booked', 409);
     const p = await c.query(
-      `insert into patients(clinic_id,full_name,phone,channel) values($1,$2,$3,$4)
-       on conflict (clinic_id,phone) do update set full_name=excluded.full_name, channel=excluded.channel returning id`,
-      [clinicId, input.fullName.trim(), phone, input.channel]);
+      `insert into patients(clinic_id,full_name,phone,channel,birth_date,gender) values($1,$2,$3,$4,$5,$6)
+       on conflict (clinic_id,phone) do update set full_name=excluded.full_name, channel=excluded.channel,
+         birth_date=coalesce(excluded.birth_date, patients.birth_date), gender=coalesce(excluded.gender, patients.gender) returning id`,
+      [clinicId, input.fullName.trim(), phone, input.channel, input.birthDate || null, input.gender || null]);
     const seq = (await c.query('select coalesce(max(ticket_seq),100)+1 n from appointments where doctor_id=$1 and appt_date=$2', [input.doctorId, input.date])).rows[0].n;
     const sortKey = new Date(`${input.date}T${input.time}:00Z`).getTime() / 60000 + seq / 1000;
     const r = await c.query(
-      `insert into appointments(clinic_id,doctor_id,patient_id,appt_date,appt_time,visit_type,channel,ticket_seq,ticket_code,token,sort_key,notified_est,created_by)
-       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning *`,
-      [clinicId, input.doctorId, p.rows[0].id, input.date, input.time, input.visitType, input.channel, seq, `${doc.code}-${seq}`, newToken(), sortKey, toMin(input.time), s.uid]);
+      `insert into appointments(clinic_id,doctor_id,patient_id,appt_date,appt_time,visit_type,channel,ticket_seq,ticket_code,token,sort_key,notified_est,created_by,reason)
+       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning *`,
+      [clinicId, input.doctorId, p.rows[0].id, input.date, input.time, input.visitType, input.channel, seq, `${doc.code}-${seq}`, newToken(), sortKey, toMin(input.time), s.uid, input.reason?.trim() || null]);
     await audit(s, 'appointment.create', 'appointment', r.rows[0].id, { ticket: r.rows[0].ticket_code }, c);
     return r.rows[0];
   });
@@ -190,7 +217,7 @@ export async function appointmentShare(clinicId: string, id: string, lang?: Lang
   const l: Lang = lang ?? (clinic.settings.language === 'ar' ? 'ar' : 'en');
   const link = trackLink(r.token);
   const text = confirmationMessage({ clinic: l === 'ar' && clinic.name_ar ? clinic.name_ar : clinic.name, doctor: l === 'ar' && r.dname_ar ? r.dname_ar : r.dname, date: String(r.appt_date), time: r.t, ticket: r.ticket_code, link, patient: r.full_name, lang: l });
-  return { id: r.id, ticket: r.ticket_code, token: r.token, link, message: text, whatsappUrl: whatsappUrl(r.phone, text), telegramUrl: telegramUrl(link, text), time: r.t, date: r.appt_date, patient: r.full_name, phone: r.phone, doctor: r.dname, lang: l };
+  return { id: r.id, patientId: r.patient_id, ticket: r.ticket_code, token: r.token, link, message: text, whatsappUrl: whatsappUrl(r.phone, text), telegramUrl: telegramUrl(link, text), time: r.t, date: r.appt_date, patient: r.full_name, phone: r.phone, doctor: r.dname, lang: l };
 }
 
 /* ---------- actions ---------- */
@@ -211,7 +238,7 @@ export async function doAction(s: Session, id: string, action: Action, p: { date
   const a = await q1<any>(
     `select a.*, to_char(a.appt_time,'HH24:MI') t, to_char(a.appt_date,'YYYY-MM-DD') d, pt.full_name from appointments a join patients pt on pt.id=a.patient_id where a.id=$1 and a.clinic_id=$2`, [id, clinicId]);
   if (!a) throw bad('Appointment not found', 404);
-  if (s.role === 'doctor' && !['start', 'end'].includes(action)) throw bad('Not allowed', 403);
+  if (s.role === 'doctor' && !['start', 'end', 'cancel', 'reschedule', 'no_show'].includes(action)) throw bad('Not allowed', 403);
   if (s.role === 'doctor' && a.doctor_id !== s.doctorId) throw bad('Not your patient', 403);
   if (!TRANSITIONS[action]?.includes(a.status)) throw bad(`Cannot ${action.replace('_', ' ')} an appointment that is ${a.status.replace('_', ' ')}`, 409);
   const clinic = await getClinic(clinicId);
@@ -243,13 +270,11 @@ export async function doAction(s: Session, id: string, action: Action, p: { date
     await notifyPatient(clinic, a, 'no_show', { ticket: a.ticket_code });
     await notifyStaff(clinicId, 'staff_no_show', info, id);
   } else if (action === 'reschedule') {
-    const date = p.date ?? a.d, time = p.time ?? a.t, newDoc = p.doctorId ?? a.doctor_id;
+    const date = p.date ?? a.d, time = p.time ?? a.t, newDoc = s.role === 'doctor' ? a.doctor_id : p.doctorId ?? a.doctor_id;
     if (!isDate(date) || !/^\d{2}:\d{2}$/.test(time)) throw bad('Invalid date/time');
     const doc = await q1<any>('select * from doctors where id=$1 and clinic_id=$2 and active', [newDoc, clinicId]);
     if (!doc) throw bad('Doctor not found', 404);
-    const slots = await listSlots(clinicId, newDoc, date);
-    const slot = slots.slots.find((x) => x.time === time);
-    if (!slot || (!slot.available && !(newDoc === a.doctor_id && date === a.d && time === a.t))) throw bad('Selected slot is not available', 409);
+    await assertTimeFree(clinic, doc, date, time, id);
     const ticket = await tx(async (c) => {
       await c.query('select pg_advisory_xact_lock(hashtext($1))', [newDoc + date]);
       const seq = (await c.query('select coalesce(max(ticket_seq),100)+1 n from appointments where doctor_id=$1 and appt_date=$2', [newDoc, date])).rows[0].n;
@@ -288,7 +313,7 @@ export async function trackView(token: string) {
   const live = LIVE.includes(me.status);
   return {
     clinic: { name: clinic.name, nameAr: clinic.name_ar, address: clinic.address, phone: clinic.phone, brandColor: clinic.brand_color, tagline: clinic.tagline, threshold: clinic.settings.notify_ahead_threshold, language: clinic.settings.language },
-    appointment: { ticket: me.ticket, patient: me.patient, date: a.d, time: me.time, status: me.status, visitType: me.visitType, doctor: { name: doc.name, nameAr: doc.name_ar, specialty: doc.specialty, specialtyAr: doc.specialty_ar } },
+    appointment: { ticket: me.ticket, patient: me.patient, date: a.d, time: me.time, status: me.status, visitType: me.visitType, reason: (await q1<any>('select reason from appointments where id=$1', [a.id]))?.reason ?? null, doctor: { name: doc.name, nameAr: doc.name_ar, specialty: doc.specialty, specialtyAr: doc.specialty_ar } },
     queue: {
       ahead: live ? me.ahead : null, estimatedTime: me.estTime, now: snap.now, delayMin: me.delayMin, nowServing: serving?.ticket ?? null,
       totalWaiting: snap.items.filter((i) => i.status === 'booked' || i.status === 'checked_in').length, isToday: snap.date === clinicNow(clinic.timezone).date,

@@ -4,7 +4,7 @@ type Dict = Record<string, string>;
 const en: Dict = {
   'brand.tagline': 'Less Waiting. Better Care.',
   // common
-  'common.save': 'Save changes', 'common.cancel': 'Cancel', 'common.close': 'Close', 'common.search': 'Search…', 'common.loading': 'Loading…', 'common.confirm': 'Confirm',
+  'common.save': 'Save', 'common.cancel': 'Cancel', 'common.close': 'Close', 'common.search': 'Search…', 'common.loading': 'Loading…', 'common.confirm': 'Confirm',
   'common.today': 'Today', 'common.back': 'Back', 'common.next': 'Next', 'common.yes': 'Yes', 'common.no': 'No', 'common.all': 'All', 'common.none': '—', 'common.min': 'min',
   'common.saved': 'Saved', 'common.error': 'Something went wrong', 'common.copied': 'Copied to clipboard', 'common.retry': 'Retry', 'common.actions': 'Actions',
   'common.name': 'Name', 'common.phone': 'Phone', 'common.doctor': 'Doctor', 'common.status': 'Status', 'common.date': 'Date', 'common.time': 'Time', 'common.email': 'Email', 'common.password': 'Password',
@@ -71,6 +71,8 @@ const en: Dict = {
   'tr.progress': 'Queue progress', 'tr.updated': 'Updated just now', 'tr.hello': 'Hello', 'tr.privacy': 'Private link — only you can see your appointment.', 'tr.inRoom': 'You are in consultation',
 
   // records
+  'act.postpone': 'Postpone', 'act.cancelBooking': 'Cancel booking', 'q.newTime': 'New date and time', 'q.typeTime': 'Type the time', 'q.pickOrType': 'Type a time or tap a free slot',
+  'visit.xray': 'X-ray', 'visit.lab': 'Lab test', 'new.examDate': 'Exam date', 'new.reason': 'Visit details', 'new.reasonHint': 'Write what is needed: visit, follow-up, X-ray, lab test…', 'new.timeOptional': 'Time (optional)', 'new.timeHint': 'Leave empty to take the first free time', 'new.openChannel': 'Save and open {channel}', 'new.savedOpen': 'Saved. Opening the message…', 'new.sendManual': 'If the app did not open, use the buttons below.',
   'pt.addPatient': 'Add patient', 'pt.dob': 'Date of birth', 'pt.gender': 'Gender', 'pt.male': 'Male', 'pt.female': 'Female', 'pt.years': 'yrs', 'pt.allergies': 'Allergies', 'pt.chronic': 'Chronic conditions', 'pt.blood': 'Blood type', 'pt.added': 'Patient added', 'pt.exists': 'Open the existing record', 'pt.editProfile': 'Edit',
   'dr.patients': 'Patients', 'dr.searchPatients': 'Search by name or phone…', 'dr.openRecord': 'Open record', 'dr.currentVisit': 'Current visit', 'dr.medical': 'Medical profile', 'dr.visitHistory': 'Visit history', 'dr.noPatients': 'No patients found', 'dr.back': 'All patients', 'dr.notStarted': 'Visit not started yet',
   'rx.title': 'New prescription', 'rx.diagnosis': 'Diagnosis', 'rx.meds': 'Medications', 'rx.med': 'Medicine', 'rx.dose': 'Dose', 'rx.freq': 'Frequency', 'rx.duration': 'Duration', 'rx.medNotes': 'Instructions', 'rx.addMed': 'Add medicine', 'rx.advice': 'Advice & notes', 'rx.followUp': 'Follow-up date',
@@ -81,7 +83,7 @@ const en: Dict = {
 
 const ar: Dict = {
   'brand.tagline': 'انتظار أقل. رعاية أفضل.',
-  'common.save': 'حفظ التغييرات', 'common.cancel': 'إلغاء', 'common.close': 'إغلاق', 'common.search': 'بحث…', 'common.loading': 'جارٍ التحميل…', 'common.confirm': 'تأكيد',
+  'common.save': 'حفظ', 'common.cancel': 'إلغاء', 'common.close': 'إغلاق', 'common.search': 'بحث…', 'common.loading': 'جارٍ التحميل…', 'common.confirm': 'تأكيد',
   'common.today': 'اليوم', 'common.back': 'رجوع', 'common.next': 'التالي', 'common.yes': 'نعم', 'common.no': 'لا', 'common.all': 'الكل', 'common.none': '—', 'common.min': 'د',
   'common.saved': 'تم الحفظ', 'common.error': 'حدث خطأ ما', 'common.copied': 'تم النسخ', 'common.retry': 'إعادة المحاولة', 'common.actions': 'إجراءات',
   'common.name': 'الاسم', 'common.phone': 'الهاتف', 'common.doctor': 'الطبيب', 'common.status': 'الحالة', 'common.date': 'التاريخ', 'common.time': 'الوقت', 'common.email': 'البريد الإلكتروني', 'common.password': 'كلمة المرور',
@@ -128,6 +130,8 @@ const ar: Dict = {
   'tr.install': 'أضف إلى الشاشة الرئيسية', 'tr.installSub': 'افتح دورك بضغطة واحدة — بدون متجر تطبيقات.', 'tr.installIos': 'اضغط مشاركة ثم "إضافة إلى الشاشة الرئيسية".', 'tr.installBtn': 'تثبيت', 'tr.live': 'مباشر', 'tr.reconnect': 'جارٍ إعادة الاتصال…', 'tr.notFound': 'هذا الرابط غير صالح', 'tr.notFoundSub': 'تأكد من الرابط في رسالتك أو تواصل مع العيادة.',
   'tr.futureDay': 'موعدك يوم {date}. تبدأ المتابعة المباشرة في يوم الزيارة.', 'tr.doctor': 'الطبيب', 'tr.visit': 'نوع الزيارة', 'tr.date': 'التاريخ', 'tr.today': 'اليوم', 'tr.waitingTotal': 'إجمالي المنتظرين',
   'tr.progress': 'تقدم الطابور', 'tr.updated': 'تم التحديث الآن', 'tr.hello': 'مرحباً', 'tr.privacy': 'رابط خاص — لا يراه غيرك.', 'tr.inRoom': 'أنت الآن في الكشف',
+  'act.postpone': 'تأجيل', 'act.cancelBooking': 'إلغاء الحجز', 'q.newTime': 'التاريخ والميعاد الجديد', 'q.typeTime': 'اكتب الميعاد', 'q.pickOrType': 'اكتب الميعاد أو اختر وقتاً متاحاً',
+  'visit.xray': 'أشعة', 'visit.lab': 'تحليل', 'new.examDate': 'تاريخ الكشف', 'new.reason': 'تفاصيل الزيارة', 'new.reasonHint': 'اكتب المطلوب: زيارة، متابعة، أشعة، تحليل…', 'new.timeOptional': 'الوقت (اختياري)', 'new.timeHint': 'اتركه فارغاً لأقرب وقت متاح', 'new.openChannel': 'حفظ وفتح {channel}', 'new.savedOpen': 'تم الحفظ. جارٍ فتح الرسالة…', 'new.sendManual': 'إن لم يفتح التطبيق استخدم الأزرار بالأسفل.',
   'pt.addPatient': 'إضافة مريض', 'pt.dob': 'تاريخ الميلاد', 'pt.gender': 'النوع', 'pt.male': 'ذكر', 'pt.female': 'أنثى', 'pt.years': 'سنة', 'pt.allergies': 'الحساسية', 'pt.chronic': 'الأمراض المزمنة', 'pt.blood': 'فصيلة الدم', 'pt.added': 'تمت إضافة المريض', 'pt.exists': 'فتح السجل الموجود', 'pt.editProfile': 'تعديل',
   'dr.patients': 'المرضى', 'dr.searchPatients': 'ابحث بالاسم أو رقم الهاتف…', 'dr.openRecord': 'فتح السجل', 'dr.currentVisit': 'الزيارة الحالية', 'dr.medical': 'الملف الطبي', 'dr.visitHistory': 'سجل الزيارات', 'dr.noPatients': 'لا يوجد مرضى', 'dr.back': 'كل المرضى', 'dr.notStarted': 'لم يبدأ الكشف بعد',
   'rx.title': 'روشتة جديدة', 'rx.diagnosis': 'التشخيص', 'rx.meds': 'الأدوية', 'rx.med': 'اسم الدواء', 'rx.dose': 'الجرعة', 'rx.freq': 'التكرار', 'rx.duration': 'المدة', 'rx.medNotes': 'تعليمات', 'rx.addMed': 'إضافة دواء', 'rx.advice': 'نصائح وملاحظات', 'rx.followUp': 'موعد المتابعة',

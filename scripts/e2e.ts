@@ -111,9 +111,22 @@ async function main() {
   ok((await rec.req('/api/clinic', { settings: { notify_ahead_threshold: 3 } }, 'PATCH')).status === 200, 'clinic changes notification threshold to 3');
   await rec.req('/api/clinic', { settings: { notify_ahead_threshold: 1 } }, 'PATCH');
 
-  console.log('\n[7] Doctor/receptionist permissions');
-  ok((await doc.req(`/api/appointments/${nextW.id}/action`, { action: 'cancel' })).status === 403, 'doctor cannot cancel appointments');
-  ok((await doc.req('/api/appointments', { fullName: 'X Y', phone: '01000000000', date: today, time: '10:00', doctorId: sara.id, visitType: 'consultation', channel: 'link' })).status === 403, 'doctor cannot create bookings');
+  console.log('\n[7] Doctor permissions');
+  const omar = cl.doctors.find((d: any) => d.code.trim() === 'B');
+  const oq = (await rec.req(`/api/queue?doctorId=${omar.id}&date=${today}`)).j.items.find((i: any) => ['booked', 'checked_in'].includes(i.status));
+  ok((await doc.req(`/api/appointments/${oq.id}/action`, { action: 'cancel' })).status === 403, "doctor cannot cancel another doctor's patient");
+  ok((await doc.req(`/api/appointments/${nextW.id}/action`, { action: 'check_in' })).status === 403, 'doctor cannot do reception-only actions (check-in)');
+  ok((await doc.req('/api/appointments', { fullName: 'X Y', phone: '01000000000', date: today, time: '10:00', doctorId: omar.id, visitType: 'consultation', channel: 'link' })).status === 403, "doctor cannot book into another doctor's queue");
+  const dreg = await doc.req('/api/appointments', { fullName: 'Doctor Added', phone: '01055500011', date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), doctorId: sara.id, visitType: 'xray', channel: 'telegram', birthDate: '1985-02-02', gender: 'male', reason: 'Chest X-ray, bring old films' });
+  ok(dreg.status === 200 || (dreg.j?.error ?? '').includes('off'), 'add-patient flow: doctor registers patient + visit (first free time)');
+  if (dreg.status === 200) {
+    ok(dreg.j.telegramUrl.startsWith('https://t.me/share/url') && dreg.j.link.includes('/t/'), 'telegram message with the patient app link is ready');
+    const tv = await track(dreg.j.token); ok(tv.appointment.reason === 'Chest X-ray, bring old films' && tv.appointment.visitType === 'xray', 'visit details (X-ray note) saved and visible in patient app');
+    ok((await doc.req(`/api/appointments/${dreg.j.id}/action`, { action: 'reschedule', date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), time: '10:07' })).status === 200, 'doctor postpones with a typed time (10:07)');
+    ok((await track(dreg.j.token)).appointment.time === '10:07', 'patient app shows the new typed time');
+    ok((await doc.req(`/api/appointments/${dreg.j.id}/action`, { action: 'reschedule', time: '23:59' })).status === 409, 'typed time outside working hours is rejected');
+    ok((await doc.req(`/api/appointments/${dreg.j.id}/action`, { action: 'cancel' })).status === 200 && (await track(dreg.j.token)).appointment.status === 'cancelled', 'doctor cancels the booking');
+  }
 
   console.log('\n[8] Your turn → complete');
   qs = await queue(); const c2 = qs.items.find((x: any) => x.status === 'in_consultation'); if (c2) await doc.req(`/api/appointments/${c2.id}/action`, { action: 'end' });

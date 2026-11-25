@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/shell';
 import { Button, Card, CardHeader, Empty, LiveDot, Skeleton, StatTile, StatusChip, Time } from '@/components/ui';
 import { usePrefs } from '@/components/providers';
 import { useLive } from '@/lib/client';
-import { useActions } from '@/components/queue-parts';
+import { RowActions, useActions } from '@/components/queue-parts';
 
 export default function DoctorHome() {
   const { t } = usePrefs();
@@ -53,9 +53,9 @@ export default function DoctorHome() {
           {!data ? <Skeleton className="m-5 h-32" /> : items.length === 0 ? <Empty title={t('q.empty')} /> : items.map((i) => (
             <div key={i.id} className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3.5">
               <span className="w-20 font-semibold tabular-nums"><Time v={i.time} /></span><span className="w-16 font-bold">{i.ticket}</span>
-              <div className="min-w-40 flex-1"><Link href={`/doctor/patients/${i.patientId}?appt=${i.id}`} className="font-medium hover:text-primary hover:underline">{i.patient}</Link><p className="text-xs text-muted">{t(`visit.${i.visitType}`)}{i.estTime && ` · ${t('q.est')} `}{i.estTime && <Time v={i.estTime} />}</p></div>
+              <div className="min-w-40 flex-1"><Link href={`/doctor/patients/${i.patientId}?appt=${i.id}`} className="font-medium hover:text-primary hover:underline">{i.patient}</Link><p dir="auto" className="text-xs text-muted">{t(`visit.${i.visitType}`)}{i.reason && ` — ${i.reason}`}{i.estTime && ` · ${t('q.est')} `}{i.estTime && <Time v={i.estTime} />}</p></div>
               <StatusChip status={i.status} />
-              <div className="w-28 text-end">{['booked', 'checked_in'].includes(i.status) && <Button size="sm" variant="soft" disabled={!!current} icon={<Play className="size-4" />} onClick={() => run(i.id, 'start')}>{t('act.start')}</Button>}</div>
+              <div className="w-full sm:w-auto"><RowActions it={i} doctorId={data.doctor.id} run={run} busy={busy} role="doctor" labeled /></div>
             </div>))}
         </div>
       </Card>

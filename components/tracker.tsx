@@ -110,6 +110,7 @@ export default function Tracker({ token }: { token: string }) {
           <section className="divide-y divide-line rounded-2xl border border-line bg-card text-sm">
             <Row k={t('tr.doctor')} v={<span>{docName}<span className="block text-xs text-muted">{spec}</span></span>} />
             <Row k={t('tr.visit')} v={t(`visit.${a.visitType}`)} />
+            {a.reason && <Row k={t('pt.notes')} v={<span dir="auto" className="whitespace-pre-wrap">{a.reason}</span>} />}
             {q.isToday && live && <Row k={t('tr.waitingTotal')} v={q.totalWaiting} />}
           </section>
 

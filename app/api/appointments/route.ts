@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { route, RECEPTION, STAFF } from '@/lib/api';
-import { createAppointment } from '@/lib/service';
+import { route, STAFF } from '@/lib/api';
+import { HttpError, registerVisit } from '@/lib/service';
 import { q } from '@/lib/db';
 
 export const GET = route(STAFF, async ({ user, req }) => {
@@ -15,7 +15,9 @@ export const GET = route(STAFF, async ({ user, req }) => {
       pt.full_name patient, pt.phone, pt.id "patientId", a.token, a.channel from appointments a join patients pt on pt.id=a.patient_id join doctors d on d.id=a.doctor_id
       where a.clinic_id=$1 and a.appt_date between $2 and $3${f} order by a.appt_date, a.appt_time, a.ticket_seq limit 500`, p);
 });
-export const POST = route(RECEPTION, async ({ user, req }) => {
-  const b = z.object({ fullName: z.string().trim().min(2).max(80), phone: z.string().min(7).max(20), date: z.string(), time: z.string(), doctorId: z.string().uuid(), visitType: z.string().min(1).max(30), channel: z.enum(['whatsapp', 'telegram', 'link']) }).parse(await req.json());
-  return createAppointment(user, b);
+export const POST = route(STAFF, async ({ user, req }) => {
+  const b = z.object({ fullName: z.string().trim().min(2).max(80), phone: z.string().min(7).max(20), date: z.string(), time: z.string().nullish(), doctorId: z.string().uuid(), visitType: z.string().min(1).max(30),
+    channel: z.enum(['whatsapp', 'telegram', 'link']), birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(), gender: z.enum(['male', 'female']).nullish(), reason: z.string().max(1000).nullish() }).parse(await req.json());
+  if (user.role === 'doctor' && b.doctorId !== user.doctorId) throw new HttpError(403, 'Doctors can only book into their own queue');
+  return registerVisit(user, b);
 });

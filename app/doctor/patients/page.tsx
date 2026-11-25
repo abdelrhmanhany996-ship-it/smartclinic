@@ -8,12 +8,14 @@ import { Button, Card, Empty, Input, Skeleton } from '@/components/ui';
 import { AddPatientModal } from '@/components/patient-form';
 import { usePrefs } from '@/components/providers';
 import { useLive } from '@/lib/client';
+import { useClinic } from '@/components/useClinic';
 import { ageOf } from '@/components/rx-print';
 
 export default function DoctorPatients() {
   const { t } = usePrefs(); const router = useRouter();
+  const clinicCtx = useClinic(); const me = useLive<any>('/api/auth/me', null).data?.user;
   const [q, setQ] = useState(''); const [add, setAdd] = useState(false);
-  const { data } = useLive<any[]>(`/api/patients?q=${encodeURIComponent(q)}`, null);
+  const { data, reload } = useLive<any[]>(`/api/patients?q=${encodeURIComponent(q)}`, null);
   return (
     <>
       <PageHeader title={t('dr.patients')} right={<><div className="relative"><Search className="pointer-events-none absolute start-3 top-3 size-4 text-muted" /><Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('dr.searchPatients')} className="!w-72 ps-9" /></div>
@@ -27,7 +29,7 @@ export default function DoctorPatients() {
             {p.allergies && <span className="chip chip-cancelled"><AlertTriangle className="size-3" />{p.allergies}</span>}
             <span className="text-sm text-muted">{t('pt.visits')}: <b className="text-ink">{p.visits}</b></span><span className="w-28 text-end text-sm text-muted tabular-nums">{p.lastVisit ?? '—'}</span></Link>; })}
       </Card>
-      <AddPatientModal medical open={add} onClose={() => setAdd(false)} onCreated={(id) => router.push(`/doctor/patients/${id}`)} />
+      <AddPatientModal open={add} onClose={() => setAdd(false)} doctors={clinicCtx.data?.doctors ?? []} myDoctorId={me?.doctorId} today={clinicCtx.data?.today ?? new Date().toISOString().slice(0, 10)} onCreated={() => reload()} />
     </>
   );
 }
