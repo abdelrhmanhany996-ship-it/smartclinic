@@ -4,6 +4,7 @@ import { pool, q1 } from '../lib/db';
 import { hash } from '../lib/auth';
 import { DEFAULT_SETTINGS } from '../lib/queue';
 import { clinicNow, fromMin, addDays, toMin } from '../lib/time';
+import { normalizePhone } from '../lib/messages';
 
 let seed = 42; const rnd = () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
 const tok = () => crypto.randomBytes(18).toString('base64url');
@@ -20,7 +21,7 @@ async function doctor(clinicId: string, o: any) {
     [clinicId, uid, o.name, o.nameAr, o.spec, o.specAr, o.code, o.avg, o.start, o.end, o.bs ?? null, o.be ?? null])).rows[0].id as string;
 }
 async function patient(clinicId: string, name: string, phone: string, channel = 'whatsapp') {
-  return (await pool.query('insert into patients(clinic_id,full_name,phone,channel) values($1,$2,$3,$4) on conflict (clinic_id,phone) do update set full_name=excluded.full_name returning id', [clinicId, name, phone, channel])).rows[0].id as string;
+  return (await pool.query('insert into patients(clinic_id,full_name,phone,channel) values($1,$2,$3,$4) on conflict (clinic_id,phone) do update set full_name=excluded.full_name returning id', [clinicId, name, normalizePhone(phone, '20'), channel])).rows[0].id as string;
 }
 const counters = new Map<string, number>();
 async function appt(clinicId: string, doc: { id: string; code: string }, pid: string, date: string, min: number, status: string, o: any = {}) {

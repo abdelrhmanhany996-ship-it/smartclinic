@@ -164,6 +164,9 @@ async function main() {
   ok(np.status === 200, 'reception adds a patient directly');
   ok((await rec.req('/api/patients', { fullName: 'Dup', phone: '01099887766' })).status === 409, 'duplicate phone rejected');
   const pid = np.j.id;
+  ok((await doc.req(`/api/patients/${pid}`, { fullName: 'Records Patient', phone: '01099887766' }, 'PATCH')).status === 200, 'saving a patient with the same number in local format is not a conflict');
+  const clash = await doc.req(`/api/patients/${pid}`, { phone: '01055500011' }, 'PATCH');
+  ok(clash.status === 409 && /Doctor Added/.test(clash.j.error), 'changing to another patient’s number is refused and names that patient');
   ok((await doc.req(`/api/patients/${pid}`, { allergies: 'Aspirin', chronic: 'Asthma', bloodType: 'A+' }, 'PATCH')).status === 200, 'doctor records allergies / chronic conditions');
   ok((await rec.req(`/api/patients/${pid}`)).j.patient.allergies === undefined, 'reception cannot see medical fields');
   ok((await doc.req(`/api/patients?q=Records`)).j.some((p: any) => p.id === pid), 'doctor can search patients');

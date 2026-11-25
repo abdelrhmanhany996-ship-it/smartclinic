@@ -20,7 +20,16 @@ export const PATCH = route<{ id: string }>(STAFF, async ({ user, req, params }) 
     allergies: z.string().max(500).nullable(), chronic: z.string().max(500).nullable(), bloodType: z.string().max(5).nullable() }).partial().parse(await req.json());
   if (user.role !== 'doctor') { delete b.allergies; delete b.chronic; delete b.bloodType; }
   let phone: string | undefined;
-  if (b.phone) { phone = normalizePhone(b.phone, (await getClinic(user.clinicId!)).settings.country_code); if (phone.length < 8) throw new HttpError(422, 'Invalid phone number'); }
+  if (b.phone) {
+    const cc = (await getClinic(user.clinicId!)).settings.country_code;
+    phone = normalizePhone(b.phone, cc); if (phone.length < 8) throw new HttpError(422, 'Invalid phone number');
+    const cur = await q1<any>('select phone from patients where id=$1 and clinic_id=$2', [params.id, user.clinicId]);
+    if (cur && normalizePhone(cur.phone, cc) === phone) phone = undefined; // same number written in another format → not a change
+    else {
+      const other = await q1<any>('select full_name from patients where clinic_id=$1 and phone=$2 and id<>$3', [user.clinicId, phone, params.id]);
+      if (other) throw new HttpError(409, `This phone number already belongs to another patient: ${other.full_name}`);
+    }
+  }
   const has = (k: string) => k in b;
   const r = await q(`update patients set full_name=coalesce($3,full_name), phone=coalesce($4,phone), notes=case when $5 then $6 else notes end, channel=coalesce($7,channel),
       birth_date=case when $8 then $9::date else birth_date end, gender=case when $10 then $11 else gender end,
