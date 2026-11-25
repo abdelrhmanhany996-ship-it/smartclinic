@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Building2, ClipboardList, CreditCard, Palette, Stethoscope, Timer } from 'lucide-react';
+import { Building2, CalendarClock, ClipboardList, CreditCard, Palette, Plus, Stethoscope, Timer, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/shell';
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Skeleton, cx } from '@/components/ui';
 import { usePrefs } from '@/components/providers';
@@ -9,14 +9,14 @@ import { useClinic } from '@/components/useClinic';
 import { DoctorScheduleForm } from '@/components/doctor-form';
 import { ago } from '@/lib/format';
 
-const TABS = [['clinic', 'st.clinic', Building2], ['branding', 'st.branding', Palette], ['queue', 'st.queue', Timer], ['doctors', 'st.doctors', Stethoscope], ['audit', 'st.audit', ClipboardList], ['sub', 'st.subscription', CreditCard]] as const;
+const TABS = [['clinic', 'st.clinic', Building2], ['schedule', 'st.schedule', CalendarClock], ['branding', 'st.branding', Palette], ['queue', 'st.queue', Timer], ['doctors', 'st.doctors', Stethoscope], ['audit', 'st.audit', ClipboardList], ['sub', 'st.subscription', CreditCard]] as const;
 
 export default function Settings() {
   const { t, toast, locale } = usePrefs();
   const c = useClinic();
   const [tab, setTab] = useState<string>('clinic');
   const [f, setF] = useState<any>(null);
-  useEffect(() => { if (c.data && !f) { const x = c.data.clinic; setF({ name: x.name, nameAr: x.name_ar ?? '', tagline: x.tagline ?? '', address: x.address ?? '', phone: x.phone ?? '', email: x.email ?? '', brandColor: x.brand_color, timezone: x.timezone, s: { ...x.settings } }); } }, [c.data, f]);
+  useEffect(() => { if (c.data && !f) { const x = c.data.clinic; setF({ name: x.name, nameAr: x.name_ar ?? '', tagline: x.tagline ?? '', address: x.address ?? '', phone: x.phone ?? '', email: x.email ?? '', brandColor: x.brand_color, timezone: x.timezone, s: { ...x.settings }, sched: x.settings.schedule ?? null, holidays: x.settings.holidays ?? [] }); } }, [c.data, f]);
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true);
@@ -26,6 +26,16 @@ export default function Settings() {
         settings: { notify_ahead_threshold: Number(s.notify_ahead_threshold), delay_notify_minutes: Number(s.delay_notify_minutes), country_code: String(s.country_code), slot_capacity: Number(s.slot_capacity), language: s.language } } });
       toast(t('common.saved')); c.reload();
     } catch (e: any) { toast(e.message, 'err'); } finally { setBusy(false); }
+  };
+  const DEFAULT_DAYS = [0, 1, 2, 3, 4, 5, 6].map((d) => ({ open: d !== 5, from: '09:00', to: '21:00' }));
+  const sched: any[] | null = f?.sched ?? null;
+  const setDay = (i: number, patch: object) => setF((x: any) => ({ ...x, sched: (x.sched ?? DEFAULT_DAYS).map((d: any, j: number) => (j === i ? { ...d, ...patch } : d)) }));
+  const [hd, setHd] = useState({ date: '', note: '' });
+  const addHoliday = () => { if (!hd.date || f.holidays.some((h: any) => h.date === hd.date)) return; setF((x: any) => ({ ...x, holidays: [...x.holidays, { date: hd.date, ...(hd.note ? { note: hd.note } : {}) }].sort((a: any, b: any) => a.date.localeCompare(b.date)) })); setHd({ date: '', note: '' }); };
+  const saveSchedule = async () => {
+    setBusy(true);
+    try { await api('/api/clinic', { method: 'PATCH', body: { settings: { schedule: f.sched, holidays: f.holidays } } }); toast(t('st.saved')); c.reload(); }
+    catch (e: any) { toast(e.message, 'err'); } finally { setBusy(false); }
   };
   const audit = useLive<any[]>(tab === 'audit' ? '/api/audit' : null, null);
   const [edit, setEdit] = useState<any>(null); const [add, setAdd] = useState(false);
@@ -51,6 +61,33 @@ export default function Settings() {
               <Field label={t('st.tz')}>{(id) => <Input id={id} dir="ltr" value={f.timezone} onChange={(e) => set('timezone', e.target.value)} />}</Field>
               <Field label={t('st.cc')}>{(id) => <Input id={id} dir="ltr" value={f.s.country_code} onChange={(e) => setS('country_code', e.target.value)} />}</Field>
               <div className="sm:col-span-2">{saveBar}</div></div></Card>}
+            {tab === 'schedule' && <div className="space-y-6">
+              <Card><CardHeader title={t('st.schedule')} sub={t('st.scheduleHint')} />
+                <div className="p-5">
+                  <label className="mb-4 flex items-center gap-2 text-sm font-medium"><input type="checkbox" className="size-4 accent-[var(--primary)]" checked={!sched} onChange={(e) => setF((x: any) => ({ ...x, sched: e.target.checked ? null : DEFAULT_DAYS }))} />{t('st.useDoctorHours')}</label>
+                  {sched && <div className="divide-y divide-line rounded-xl border border-line">
+                    {sched.map((d: any, i: number) => (
+                      <div key={i} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                        <span className="w-24 font-semibold">{t(`day.${i}`)}</span>
+                        <button type="button" role="switch" aria-checked={d.open} onClick={() => setDay(i, { open: !d.open })} className={cx('relative h-7 w-12 rounded-full transition', d.open ? 'bg-primary' : 'bg-line')}><span className={cx('absolute top-0.5 size-6 rounded-full bg-white shadow transition-all', d.open ? 'start-[22px]' : 'start-0.5')} /></button>
+                        <span className={cx('w-16 text-sm font-medium', d.open ? 'text-[var(--done-fg)]' : 'text-muted')}>{d.open ? t('st.open') : t('st.closed')}</span>
+                        {d.open && <div className="flex flex-wrap items-center gap-2"><span className="text-sm text-muted">{t('st.from')}</span><Input type="time" className="!w-32" value={d.from} onChange={(e) => setDay(i, { from: e.target.value })} aria-label={`${t(`day.${i}`)} ${t('st.from')}`} />
+                          <span className="text-sm text-muted">{t('st.to')}</span><Input type="time" className="!w-32" value={d.to} onChange={(e) => setDay(i, { to: e.target.value })} aria-label={`${t(`day.${i}`)} ${t('st.to')}`} /></div>}
+                      </div>))}
+                  </div>}
+                </div></Card>
+              <Card><CardHeader title={t('st.holidays')} sub={t('st.holidayHint')} />
+                <div className="space-y-4 p-5">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <Field label={t('common.date')}>{(id) => <Input id={id} type="date" min={c.data?.today} value={hd.date} onChange={(e) => setHd({ ...hd, date: e.target.value })} className="!w-auto" />}</Field>
+                    <Field label={t('st.holidayNote')}>{(id) => <Input id={id} dir="auto" value={hd.note} maxLength={80} onChange={(e) => setHd({ ...hd, note: e.target.value })} className="!w-64" />}</Field>
+                    <Button variant="soft" icon={<Plus className="size-4" />} disabled={!hd.date} onClick={addHoliday}>{t('st.addHoliday')}</Button></div>
+                  {f.holidays.length === 0 ? <p className="text-sm text-muted">{t('st.noHolidays')}</p> : <ul className="divide-y divide-line rounded-xl border border-line">
+                    {f.holidays.map((h: any) => <li key={h.date} className="flex items-center gap-3 px-4 py-2.5 text-sm"><span className="w-28 font-semibold tabular-nums">{h.date}</span><span dir="auto" className="flex-1 text-muted">{h.note ?? ''}</span>
+                      <button type="button" aria-label="Remove" onClick={() => setF((x: any) => ({ ...x, holidays: x.holidays.filter((y: any) => y.date !== h.date) }))} className="grid size-8 place-items-center rounded-lg text-muted hover:bg-surface hover:text-danger"><Trash2 className="size-4" /></button></li>)}</ul>}
+                </div></Card>
+              <Button onClick={saveSchedule} loading={busy}>{t('common.save')}</Button>
+            </div>}
             {tab === 'branding' && <Card><CardHeader title={t('st.branding')} /><div className="grid gap-4 p-5 sm:grid-cols-2">
               <Field label={t('st.tagline')}>{(id) => <Input id={id} value={f.tagline} onChange={(e) => set('tagline', e.target.value)} />}</Field>
               <Field label={t('st.color')}>{(id) => <div className="flex gap-2"><input id={id} type="color" value={f.brandColor} onChange={(e) => set('brandColor', e.target.value)} className="h-10 w-14 cursor-pointer rounded-lg border border-line bg-transparent" /><Input dir="ltr" value={f.brandColor} onChange={(e) => set('brandColor', e.target.value)} /></div>}</Field>

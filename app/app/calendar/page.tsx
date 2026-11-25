@@ -18,6 +18,7 @@ export default function Calendar() {
   const days = useMemo(() => (start ? Array.from({ length: 7 }, (_, i) => addDays(start, i)) : []), [start]);
   const { data, reload } = useLive<any[]>(start ? `/api/appointments?from=${start}&to=${addDays(start, 6)}${doctor ? `&doctorId=${doctor}` : ''}` : null, '/api/events');
   const { run, busy } = useActions(reload);
+  const closedKind = (d: string) => { const st = clinic.data?.clinic.settings; if (!st) return null; if ((st.holidays ?? []).some((h: any) => h.date === d)) return 'holiday'; const dw = new Date(d + 'T12:00:00Z').getUTCDay(); return st.schedule && !st.schedule[dw]?.open ? 'closed' : null; };
   const byDay = (d: string) => (data ?? []).filter((a) => a.date === d);
   const fmt = (d: string, o: Intl.DateTimeFormatOptions) => new Date(d + 'T12:00:00Z').toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-GB', { ...o, timeZone: 'UTC' });
   const sh = (n: number) => setAnchor(addDays(anchor, n));
@@ -32,7 +33,7 @@ export default function Calendar() {
         {days.map((d) => { const n = byDay(d).filter((a) => a.status !== 'cancelled').length; const today = d === clinic.data?.today; return (
           <button key={d} onClick={() => setSel(d)} className={cx('rounded-xl border p-2 text-center transition sm:p-3', sel === d ? 'border-primary bg-primary text-primary-fg shadow' : 'border-line bg-card hover:bg-surface')}>
             <p className="text-[11px] font-semibold uppercase opacity-80">{fmt(d, { weekday: 'short' })}</p><p className="text-lg font-bold sm:text-2xl">{fmt(d, { day: 'numeric' })}</p>
-            <p className={cx('mx-auto mt-1 w-fit rounded-full px-2 text-[11px] font-semibold', sel === d ? 'bg-white/20' : n ? 'bg-primary-soft text-primary' : 'text-muted')}>{n}{today && ' •'}</p></button>); })}
+            <p className={cx('mx-auto mt-1 w-fit rounded-full px-2 text-[11px] font-semibold', sel === d ? 'bg-white/20' : n ? 'bg-primary-soft text-primary' : 'text-muted')}>{n}{today && ' •'}</p>{closedKind(d) && <p className={cx('mt-1 text-[10px] font-semibold', sel === d ? 'opacity-90' : 'text-[var(--bad-fg)]')}>{t('st.closed')}</p>}</button>); })}
       </div>
       <Card>
         <div className="border-b border-line px-5 py-4 font-semibold">{sel && fmt(sel, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>

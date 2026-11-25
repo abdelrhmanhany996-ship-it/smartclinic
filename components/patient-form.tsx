@@ -4,6 +4,7 @@ import { Button, Field, Input, Modal, Select, Textarea, cx } from './ui';
 import { ShareBody } from './queue-parts';
 import { usePrefs } from './providers';
 import { api } from '@/lib/client';
+import { dayOffKey } from '@/lib/schedule';
 
 const CHIPS = ['consultation', 'follow_up', 'xray', 'lab'] as const;
 
@@ -31,13 +32,16 @@ export function AddPatientModal({ open, onClose, onCreated, doctors, myDoctorId,
   };
   const changeLang = async (l: string) => { setLang(l); setDone(await api(`/api/appointments/${done.id}/share?lang=${l}`)); };
   const copy = async () => { try { await navigator.clipboard.writeText(done.link); toast(t('common.copied')); } catch {} };
-  const doc = doctors.find((d) => d.id === f.doctorId);
-  const hm = (v?: string) => (v ? String(v).slice(0, 5) : '');
+  const [win, setWin] = useState<{ dayOff: boolean; reason?: string; from?: string; to?: string } | null>(null);
+  useEffect(() => {
+    if (!open || !f.doctorId || !f.date) return;
+    let live = true; setWin(null);
+    api(`/api/slots?doctorId=${f.doctorId}&date=${f.date}`).then((r) => live && setWin({ dayOff: r.dayOff, reason: r.reason, from: r.window?.from, to: r.window?.to })).catch(() => {});
+    return () => { live = false; };
+  }, [open, f.doctorId, f.date]);
   const toM = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
-  const dow = f.date ? new Date(f.date + 'T12:00:00Z').getUTCDay() : -1;
-  const dayOff = !!doc && f.date !== '' && !doc.work_days?.includes(dow);
-  const outside = !!doc && !!f.time && (toM(f.time) < toM(hm(doc.work_start)) || toM(f.time) >= toM(hm(doc.work_end)));
-  const timeErr = dayOff ? t('new.dayOffPick') : outside ? t('new.outsideHours', { from: hm(doc.work_start), to: hm(doc.work_end) }) : '';
+  const outside = !!win && !win.dayOff && !!f.time && !!win.from && !!win.to && (toM(f.time) < toM(win.from) || toM(f.time) >= toM(win.to));
+  const timeErr = win?.dayOff ? t(dayOffKey(win.reason)) : outside ? t('new.outsideHours', { from: win!.from!, to: win!.to! }) : '';
   const valid = f.fullName.trim().length >= 2 && f.phone.replace(/\D/g, '').length >= 8 && !!f.date && !!f.doctorId && !timeErr;
 
   return (
@@ -50,9 +54,9 @@ export function AddPatientModal({ open, onClose, onCreated, doctors, myDoctorId,
         <Field label={t('pt.dob')}>{(id) => <Input id={id} type="date" max={today} value={f.birthDate} onChange={(e) => set('birthDate', e.target.value)} />}</Field>
         <Field label={t('pt.gender')}>{(id) => <Select id={id} value={f.gender} onChange={(e) => set('gender', e.target.value)}><option value="">—</option><option value="male">{t('pt.male')}</option><option value="female">{t('pt.female')}</option></Select>}</Field>
         <Field label={t('new.channel')}>{(id) => <Select id={id} value={f.channel} onChange={(e) => set('channel', e.target.value)}><option value="whatsapp">WhatsApp</option><option value="telegram">Telegram</option><option value="link">{t('new.channelLink')}</option></Select>}</Field>
-        <Field label={t('new.examDate')}>{(id) => <Input id={id} type="date" required min={today} value={f.date} onChange={(e) => set('date', e.target.value)} />}</Field>
+        <Field label={t('new.examDate')} error={win?.dayOff ? t(dayOffKey(win.reason)) : undefined}>{(id) => <Input id={id} type="date" required min={today} value={f.date} onChange={(e) => set('date', e.target.value)} />}</Field>
         {!myDoctorId && <Field label={t('common.doctor')}>{(id) => <Select id={id} value={f.doctorId} onChange={(e) => set('doctorId', e.target.value)}>{doctors.filter((d) => d.active).map((d) => <option key={d.id} value={d.id}>{locale === 'ar' && d.name_ar ? d.name_ar : d.name}</option>)}</Select>}</Field>}
-        <Field label={t('new.timeOptional')} error={timeErr || undefined} hint={doc ? `${t('new.hours', { from: hm(doc.work_start), to: hm(doc.work_end) })} · ${t('new.timeHint')}` : t('new.timeHint')}>{(id) => <Input id={id} type="time" value={f.time} onChange={(e) => set('time', e.target.value)} />}</Field>
+        <Field label={t('new.timeOptional')} error={!win?.dayOff && timeErr ? timeErr : undefined} hint={win?.from ? `${t('new.hours', { from: win.from, to: win.to! })} · ${t('new.timeHint')}` : t('new.timeHint')}>{(id) => <Input id={id} type="time" value={f.time} onChange={(e) => set('time', e.target.value)} />}</Field>
         <div className="sm:col-span-2"><Field label={t('new.reason')}>{(id) => <div className="space-y-2">
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t('new.visitType')}>{CHIPS.map((c) => <button key={c} type="button" role="radio" aria-checked={f.visitType === c} onClick={() => set('visitType', c)}
             className={cx('h-9 rounded-full border px-4 text-sm font-medium transition', f.visitType === c ? 'border-primary bg-primary text-primary-fg' : 'border-line hover:bg-surface')}>{t(`visit.${c}`)}</button>)}</div>

@@ -28,6 +28,7 @@ async function main() {
   console.log('SmartClinic E2E →', BASE);
   const rec = await new Client().login('reception@nilecare.demo', 'Demo@123');
   const doc = await new Client().login('sara@nilecare.demo', 'Demo@123');
+  await rec.req('/api/clinic', { timezone: 'America/Los_Angeles' }, 'PATCH'); // keep the test independent of the time of day
   const { j: cl } = await rec.req('/api/clinic');
   const sara = cl.doctors.find((d: any) => d.code.trim() === 'A');
   const today = cl.today;
@@ -182,6 +183,23 @@ async function main() {
   ok((await doc2.req(`/api/patients/${pid}/prescriptions`)).j.length === 0, "other clinic's doctor cannot read these prescriptions");
   ok((await doc2.req(`/api/prescriptions/${rx.j.id}/send`, {})).status === 404, "other clinic cannot send this prescription");
 
+  console.log('\n[9c] Clinic schedule: open days, hours, holidays');
+  const hd = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+  ok((await rec.req('/api/clinic', { settings: { holidays: [{ date: hd, note: 'Test holiday' }] } }, 'PATCH')).status === 200, 'reception adds a holiday');
+  const hs = (await rec.req(`/api/slots?doctorId=${sara.id}&date=${hd}`)).j; ok(hs.dayOff === true && hs.reason === 'holiday', 'holiday: no slots, reason = holiday');
+  const hb = await rec.req('/api/appointments', { fullName: 'Holiday Try', phone: '01055500044', date: hd, time: '10:00', doctorId: sara.id, visitType: 'consultation', channel: 'link' });
+  ok(hb.status === 409 && /holiday/i.test(hb.j.error), 'booking on a holiday is stopped');
+  ok((await rec.req('/api/clinic', { settings: { holidays: [] } }, 'PATCH')).status === 200 && (await rec.req(`/api/slots?doctorId=${sara.id}&date=${hd}`)).j.dayOff === false, 'removing the holiday re-opens the date');
+  const dwk = new Date(hd + 'T12:00:00Z').getUTCDay();
+  const sched = [0, 1, 2, 3, 4, 5, 6].map((d) => ({ open: d !== dwk, from: '12:00', to: '14:00' }));
+  ok((await rec.req('/api/clinic', { settings: { schedule: sched } }, 'PATCH')).status === 200, 'reception sets clinic hours 12:00–14:00 and closes one weekday');
+  const cs = (await rec.req(`/api/slots?doctorId=${sara.id}&date=${hd}`)).j; ok(cs.dayOff === true && cs.reason === 'clinic_closed', 'closed weekday: no slots');
+  const od = new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10); const odw = new Date(od + 'T12:00:00Z').getUTCDay();
+  if (odw !== dwk) { const os = (await rec.req(`/api/slots?doctorId=${sara.id}&date=${od}`)).j; ok(os.window.from === '12:00' && os.window.to === '14:00' && os.slots.every((x: any) => x.time >= '12:00' && x.time < '14:00'), 'open day: slots limited to clinic hours');
+    const ob = await rec.req('/api/appointments', { fullName: 'Early Bird', phone: '01055500055', date: od, time: '10:00', doctorId: sara.id, visitType: 'consultation', channel: 'link' }); ok(ob.status === 409 && /12:00/.test(ob.j.error), 'booking outside clinic hours is rejected and names the hours'); }
+  ok((await rec.req('/api/clinic', { settings: { schedule: null } }, 'PATCH')).status === 200, 'schedule can be reset to doctor hours');
+  ok((await doc.req('/api/clinic', { settings: { holidays: [] } }, 'PATCH')).status === 403, 'doctor cannot edit clinic schedule');
+
   console.log('\n[10] Multi-clinic isolation');
   const other = await new Client().login('reception@alnoor.demo', 'Demo@123');
   const list = await other.req(`/api/appointments?date=${today}`);
@@ -206,6 +224,7 @@ async function main() {
   ok((await new Client().req('/api/auth/login', { email: slug + '@e2e.test', password: 'Passw0rd!x' })).status === 401, 'suspended clinic cannot log in');
   const al = (await q('select count(*)::int n from audit_logs where clinic_id is not null'))[0].n; ok(al > 5, `audit log recorded actions (${al} entries)`);
 
+  await rec.req('/api/clinic', { timezone: 'Africa/Cairo' }, 'PATCH');
   console.log(`\n${fail ? '✗' : '✓'} ${pass} passed, ${fail} failed`);
   await pool.end(); process.exit(fail ? 1 : 0);
 }

@@ -7,8 +7,11 @@ type Listener = (e: LiveEvent) => void;
 const g = globalThis as unknown as { __hub?: { listeners: Set<Listener>; started: boolean } };
 const hub = (g.__hub ??= { listeners: new Set(), started: false });
 
+/** Serverless hosts cannot keep a LISTEN connection per instance (it exhausts the DB pool): realtime falls back to fast polling. */
+export const realtimeEnabled = !process.env.VERCEL && process.env.REALTIME !== 'off';
+
 async function start() {
-  if (hub.started) return;
+  if (hub.started || !realtimeEnabled) return;
   hub.started = true;
   const connect = async () => {
     const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: process.env.PGSSL === 'require' ? { rejectUnauthorized: false } : undefined });
@@ -30,11 +33,13 @@ export function subscribe(l: Listener) {
   return () => { hub.listeners.delete(l); };
 }
 export async function emit(e: LiveEvent, client?: { query: Function }) {
+  if (!realtimeEnabled) return;
   await (client ?? pool).query('select pg_notify($1, $2)', ['sc_events', JSON.stringify(e)]);
 }
 
 /** Build an SSE Response that forwards matching events as `refresh` pings. */
 export function sseResponse(req: Request, match: (e: LiveEvent) => boolean) {
+  if (!realtimeEnabled) return new Response(null, { status: 204 }); // tells EventSource to stop; the client switches to polling
   const enc = new TextEncoder();
   let cleanup = () => {};
   const stream = new ReadableStream({

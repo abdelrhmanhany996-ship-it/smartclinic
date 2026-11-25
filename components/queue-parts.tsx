@@ -4,6 +4,7 @@ import { Check, CheckCircle2, Clock, MessageCircle, Play, Send, SkipForward, Use
 import { Button, Modal, Select, Field, Input, StatusChip, Time } from './ui';
 import { usePrefs } from './providers';
 import { api } from '@/lib/client';
+import { dayOffKey } from '@/lib/schedule';
 
 export interface QItem { id: string; ticket: string; patient: string; phone: string; time: string; status: string; visitType: string; token: string; ahead: number | null; estTime: string | null; delayMin: number; durationMin: number; startedAt: string | null; checkedInAt: string | null }
 
@@ -69,9 +70,9 @@ function Reschedule({ it, doctorId, lockDoctor, onClose, onSave }: { it: QItem; 
   const { t, locale } = usePrefs();
   const [date, setDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [docs, setDocs] = useState<any[]>([]); const [doc, setDoc] = useState(doctorId);
-  const [slots, setSlots] = useState<any[]>([]); const [dayOff, setDayOff] = useState(false); const [time, setTime] = useState(it.time);
+  const [slots, setSlots] = useState<any[]>([]); const [dayOff, setDayOff] = useState(false); const [reason, setReason] = useState<string | undefined>(); const [time, setTime] = useState(it.time);
   useEffect(() => { if (!lockDoctor) api('/api/clinic').then((r) => setDocs(r.doctors.filter((d: any) => d.active))); }, [lockDoctor]);
-  const load = async (d: string, dc: string) => { try { const r = await api(`/api/slots?doctorId=${dc}&date=${d}`); setSlots(r.slots); setDayOff(!!r.dayOff); } catch { setSlots([]); setDayOff(false); } };
+  const load = async (d: string, dc: string) => { try { const r = await api(`/api/slots?doctorId=${dc}&date=${d}`); setSlots(r.slots); setDayOff(!!r.dayOff); setReason(r.reason); } catch { setSlots([]); setDayOff(false); } };
   useEffect(() => { load(date, doc); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   return (
     <Modal open onClose={onClose} title={`${t('act.postpone')} · ${it.ticket} · ${it.patient}`} wide>
@@ -85,7 +86,7 @@ function Reschedule({ it, doctorId, lockDoctor, onClose, onSave }: { it: QItem; 
         {slots.map((s) => <button key={s.time} type="button" disabled={!s.available} onClick={() => setTime(s.time)} className={`rounded-lg border px-2 py-2 text-sm font-medium transition ${time === s.time ? 'border-primary bg-primary text-primary-fg' : 'border-line hover:bg-surface'} disabled:opacity-35 disabled:line-through`}><Time v={s.time} /></button>)}
         {!slots.length && !dayOff && <p className="col-span-full text-sm text-muted">{t('new.noSlots')}</p>}
       </div>
-      {dayOff && <p role="alert" className="mt-2 rounded-lg bg-[var(--wait-bg)] px-3 py-2 text-sm font-medium text-[var(--wait-fg)]">{t('new.dayOffPick')}</p>}
+      {dayOff && <p role="alert" className="mt-2 rounded-lg bg-[var(--wait-bg)] px-3 py-2 text-sm font-medium text-[var(--wait-fg)]">{t(dayOffKey(reason))}</p>}
       <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button><Button disabled={!time || !date || dayOff} onClick={() => onSave({ date, time, doctorId: doc })}>{t('common.confirm')}</Button></div>
     </Modal>
   );

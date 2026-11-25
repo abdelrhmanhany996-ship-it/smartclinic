@@ -6,9 +6,12 @@ const g = globalThis as unknown as { __pool?: Pool };
 export const pool: Pool =
   g.__pool ??
   (g.__pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    // On serverless (Vercel) use the transaction pooler URL when provided and keep very few connections per instance.
+    connectionString: process.env.DATABASE_POOL_URL || process.env.DATABASE_URL,
     ssl: process.env.PGSSL === 'require' ? { rejectUnauthorized: false } : undefined,
-    max: 10,
+    max: process.env.VERCEL ? 2 : 10,
+    idleTimeoutMillis: process.env.VERCEL ? 5000 : 30000,
+    connectionTimeoutMillis: 8000,
   }));
 
 export async function q<T extends QueryResultRow = any>(sql: string, params: unknown[] = []): Promise<T[]> {

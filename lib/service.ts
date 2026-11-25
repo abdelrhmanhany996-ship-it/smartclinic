@@ -5,6 +5,7 @@ import { emit } from './events';
 import { pushToAppointment } from './push';
 import { computeQueue, DEFAULT_SETTINGS, durationFor, LIVE, QItem, Status } from './queue';
 import { addDays, clinicNow, fromMin, isDate, toMin } from './time';
+import { effectiveWindow } from './schedule';
 import { notifText } from './notiftext';
 import { confirmationMessage, normalizePhone, telegramUrl, whatsappUrl, Lang } from './messages';
 import type { Session } from './auth';
@@ -34,8 +35,8 @@ export async function listSlots(clinicId: string, doctorId: string, date: string
   const clinic = await getClinic(clinicId);
   const d = await q1<any>('select * from doctors where id=$1 and clinic_id=$2 and active', [doctorId, clinicId]);
   if (!d) throw bad('Doctor not found', 404);
-  const dow = new Date(date + 'T12:00:00Z').getUTCDay();
-  if (!d.work_days.includes(dow)) return { slots: [], dayOff: true };
+  const win = effectiveWindow(clinic, d, date);
+  if (!win.open) return { slots: [], dayOff: true, reason: win.reason, window: null as null | { from: string; to: string } };
   const booked = await q<any>(
     `select to_char(appt_time,'HH24:MI') t, count(*)::int n from appointments
       where doctor_id=$1 and appt_date=$2 and status in ('booked','checked_in','in_consultation','completed','skipped') group by 1`, [doctorId, date]);
@@ -44,7 +45,7 @@ export async function listSlots(clinicId: string, doctorId: string, date: string
   const step = d.avg_duration_min;
   const slots: { time: string; available: boolean; reason?: string }[] = [];
   const bs = d.break_start ? toMin(d.break_start) : null, be = d.break_end ? toMin(d.break_end) : null;
-  for (let m = toMin(d.work_start); m + step <= toMin(d.work_end); m += step) {
+  for (let m = win.start; m + step <= win.end; m += step) {
     const time = fromMin(m);
     const n = booked.find((b) => b.t === time)?.n ?? 0;
     let reason: string | undefined;
@@ -53,15 +54,16 @@ export async function listSlots(clinicId: string, doctorId: string, date: string
     else if (n >= cap) reason = 'booked';
     slots.push({ time, available: !reason, reason });
   }
-  return { slots, dayOff: false };
+  return { slots, dayOff: false, reason: undefined as string | undefined, window: { from: fromMin(win.start), to: fromMin(win.end) } as null | { from: string; to: string } };
 }
 
 /** Free-typed time: inside working hours, not in the break, not in the past, and the exact minute not already full. */
 async function assertTimeFree(clinic: any, doc: any, date: string, time: string, excludeId: string) {
   if (!isDate(date) || !/^\d{2}:\d{2}$/.test(time)) throw bad('Invalid date/time');
-  const dow = new Date(date + 'T12:00:00Z').getUTCDay(); const m = toMin(time);
-  if (!doc.work_days.includes(dow)) throw bad('Doctor is off on this day', 409);
-  if (m < toMin(doc.work_start) || m >= toMin(doc.work_end)) throw bad(`Outside working hours (${doc.work_start.slice(0, 5)}–${doc.work_end.slice(0, 5)})`, 409);
+  const m = toMin(time);
+  const win = effectiveWindow(clinic, doc, date);
+  if (!win.open) throw bad(win.reason === 'holiday' ? 'The clinic is closed on this date (holiday)' : win.reason === 'clinic_closed' ? 'The clinic is closed on this day' : 'Doctor is off on this day', 409);
+  if (m < win.start || m >= win.end) throw bad(`Outside working hours (${fromMin(win.start)}–${fromMin(win.end)})`, 409);
   if (doc.break_start && doc.break_end && m >= toMin(doc.break_start) && m < toMin(doc.break_end)) throw bad('Doctor is on break at this time', 409);
   const now = clinicNow(clinic.timezone);
   if (date < now.date || (date === now.date && m < now.min - 5)) throw bad('This time has passed', 409);

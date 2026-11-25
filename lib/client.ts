@@ -27,14 +27,18 @@ export function useLive<T>(path: string | null, sse: string | null, opts: { poll
   useEffect(() => {
     if (!sse) return;
     let es: EventSource | null = null, closed = false;
+    let pollMs = opts.poll ?? 30000; let poll: ReturnType<typeof setInterval>;
+    const startPoll = () => { clearInterval(poll); poll = setInterval(load, pollMs); };
     const open = () => {
       es = new EventSource(sse);
       es.addEventListener('ready', () => { setConnected(true); load(); });
       es.addEventListener('refresh', () => { load(); setTick((x) => x + 1); });
-      es.onerror = () => { setConnected(false); };
+      es.onerror = () => {
+        if (es && es.readyState === EventSource.CLOSED && !closed) { setConnected(true); pollMs = 5000; startPoll(); } // no realtime stream on this host → poll every 5s
+        else setConnected(false);
+      };
     };
-    open();
-    const poll = setInterval(load, opts.poll ?? 30000);
+    open(); startPoll();
     const vis = () => { if (document.visibilityState === 'visible') load(); };
     document.addEventListener('visibilitychange', vis);
     return () => { closed = true; es?.close(); clearInterval(poll); document.removeEventListener('visibilitychange', vis); };

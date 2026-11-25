@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/shell';
 import { Button, Card, CardHeader, Field, Input, Select, Time, Skeleton, cx } from '@/components/ui';
 import { usePrefs } from '@/components/providers';
 import { api } from '@/lib/client';
+import { dayOffKey } from '@/lib/schedule';
 import { useClinic } from '@/components/useClinic';
 
 function NewAppointment() {
@@ -14,14 +15,14 @@ function NewAppointment() {
   const clinic = useClinic();
   const sp = useSearchParams();
   const [doctorId, setDoctorId] = useState(''); const [date, setDate] = useState(''); const [time, setTime] = useState('');
-  const [slots, setSlots] = useState<{ time: string; available: boolean; reason?: string }[] | null>(null); const [dayOff, setDayOff] = useState(false);
+  const [slots, setSlots] = useState<{ time: string; available: boolean; reason?: string }[] | null>(null); const [dayOff, setDayOff] = useState(false); const [offReason, setOffReason] = useState<string | undefined>();
   const [name, setName] = useState(sp.get('name') ?? ''); const [phone, setPhone] = useState(sp.get('phone') ?? '');
   const [visit, setVisit] = useState('consultation'); const [channel, setChannel] = useState<'whatsapp' | 'telegram' | 'link'>('whatsapp');
   const [known, setKnown] = useState(false); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
   const [done, setDone] = useState<any>(null); const [lang, setLang] = useState<string>('');
 
   useEffect(() => { if (clinic.data) { if (!doctorId) setDoctorId(clinic.data.doctors.find((d) => d.active)?.id ?? ''); if (!date) setDate(clinic.data.today); if (!lang) setLang(clinic.data.clinic.settings.language); } }, [clinic.data, doctorId, date, lang]);
-  const loadSlots = async () => { if (!doctorId || !date) return; setSlots(null); try { const r = await api(`/api/slots?doctorId=${doctorId}&date=${date}`); setSlots(r.slots); setDayOff(r.dayOff); } catch (e: any) { setSlots([]); toast(e.message, 'err'); } };
+  const loadSlots = async () => { if (!doctorId || !date) return; setSlots(null); try { const r = await api(`/api/slots?doctorId=${doctorId}&date=${date}`); setSlots(r.slots); setDayOff(r.dayOff); setOffReason(r.reason); } catch (e: any) { setSlots([]); toast(e.message, 'err'); } };
   useEffect(() => { setTime(''); loadSlots(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [doctorId, date]);
   useEffect(() => { // autofill existing patient by phone
     const d = phone.replace(/\D/g, ''); if (d.length < 8) { setKnown(false); return; }
@@ -80,7 +81,7 @@ function NewAppointment() {
             </div>
             <div><p className="mb-2 text-sm font-medium">{t('new.slots')}</p>
               {slots === null ? <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">{Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
-                : dayOff ? <p className="rounded-lg bg-surface p-4 text-sm text-muted">{t('new.dayOff')}</p>
+                : dayOff ? <p className="rounded-lg bg-[var(--wait-bg)] p-4 text-sm font-medium text-[var(--wait-fg)]">{t(dayOffKey(offReason))}</p>
                 : !slots.some((s) => s.available) ? <p className="rounded-lg bg-surface p-4 text-sm text-muted">{t('new.noSlots')}</p>
                 : <div role="radiogroup" aria-label={t('new.slots')} className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-5">
                   {slots.map((s) => <button key={s.time} role="radio" aria-checked={time === s.time} disabled={!s.available} onClick={() => setTime(s.time)} title={s.reason ? t(`new.slot${s.reason[0].toUpperCase() + s.reason.slice(1)}`) : ''}
