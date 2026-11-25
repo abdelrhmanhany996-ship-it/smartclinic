@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Field, Input, Modal, Select, Textarea, cx } from './ui';
 import { ShareBody } from './queue-parts';
+import { PatientFields, PatientValues, blankPatient } from './patient-fields';
 import { usePrefs } from './providers';
 import { api } from '@/lib/client';
 import { dayOffKey } from '@/lib/schedule';
@@ -9,13 +10,14 @@ import { dayOffKey } from '@/lib/schedule';
 const CHIPS = ['consultation', 'follow_up', 'xray', 'lab'] as const;
 
 /** Add patient + book the visit, then open WhatsApp/Telegram with the message containing the patient's private link. */
-export function AddPatientModal({ open, onClose, onCreated, doctors, myDoctorId, today }: { open: boolean; onClose: () => void; onCreated: (patientId: string) => void; doctors: any[]; myDoctorId?: string | null; today: string }) {
+export function AddPatientModal({ open, onClose, onCreated, doctors, myDoctorId, today, medical }: { open: boolean; onClose: () => void; onCreated: (patientId: string) => void; doctors: any[]; myDoctorId?: string | null; today: string; medical?: boolean }) {
   const { t, toast, locale } = usePrefs();
-  const blank = { fullName: '', phone: '', birthDate: '', gender: '', channel: 'whatsapp', date: today, time: '', visitType: 'consultation', reason: '', doctorId: myDoctorId ?? '' };
+  const blank = { ...blankPatient, date: today, time: '', visitType: 'consultation', reason: '', doctorId: myDoctorId ?? '' };
   const [f, setF] = useState(blank); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
   const [done, setDone] = useState<any>(null); const [lang, setLang] = useState<string>(locale);
   useEffect(() => { if (open) { setF({ ...blank, date: today, doctorId: myDoctorId ?? doctors.find((d) => d.active)?.id ?? '' }); setDone(null); setErr(''); } /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open, today, myDoctorId, doctors.length]);
   const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));
+  const pv: PatientValues = f;
   const chName = f.channel === 'telegram' ? 'Telegram' : f.channel === 'whatsapp' ? 'WhatsApp' : t('act.copy');
 
   const save = async () => {
@@ -23,7 +25,7 @@ export function AddPatientModal({ open, onClose, onCreated, doctors, myDoctorId,
     // open the window synchronously (inside the click) so the browser does not block it; navigate once we have the link
     const win = f.channel !== 'link' ? window.open('about:blank', '_blank') : null;
     try {
-      const r = await api<any>('/api/appointments', { body: { fullName: f.fullName, phone: f.phone, date: f.date, time: f.time || null, doctorId: f.doctorId, visitType: f.visitType, channel: f.channel, birthDate: f.birthDate || null, gender: f.gender || null, reason: f.reason || null } });
+      const r = await api<any>('/api/appointments', { body: { fullName: f.fullName, phone: f.phone, date: f.date, time: f.time || null, doctorId: f.doctorId, visitType: f.visitType, channel: f.channel, birthDate: f.birthDate || null, gender: f.gender || null, reason: f.reason || null, ...(medical ? { allergies: f.allergies || null, chronic: f.chronic || null, bloodType: f.bloodType || null } : {}), notes: f.notes || null } });
       setDone(r); onCreated(r.patientId);
       const url = f.channel === 'whatsapp' ? r.whatsappUrl : f.channel === 'telegram' ? r.telegramUrl : null;
       if (url && win) { win.location.href = url; toast(t('new.savedOpen')); }
@@ -49,11 +51,8 @@ export function AddPatientModal({ open, onClose, onCreated, doctors, myDoctorId,
       {done ? <div className="space-y-3"><p className="text-sm text-muted">{t('new.sendManual')}</p><ShareBody d={done} lang={lang} change={changeLang} copy={copy} />
         <div className="flex justify-end"><Button onClick={onClose}>{t('common.close')}</Button></div></div> : (
       <form className="grid gap-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); if (valid) save(); }}>
-        <Field label={t('new.fullName')}>{(id) => <Input id={id} required value={f.fullName} onChange={(e) => set('fullName', e.target.value)} maxLength={80} />}</Field>
-        <Field label={t('new.phone')} hint={t('new.phoneHint')}>{(id) => <Input id={id} required dir="ltr" inputMode="tel" value={f.phone} onChange={(e) => set('phone', e.target.value)} className="text-start" />}</Field>
-        <Field label={t('pt.dob')}>{(id) => <Input id={id} type="date" max={today} value={f.birthDate} onChange={(e) => set('birthDate', e.target.value)} />}</Field>
-        <Field label={t('pt.gender')}>{(id) => <Select id={id} value={f.gender} onChange={(e) => set('gender', e.target.value)}><option value="">—</option><option value="male">{t('pt.male')}</option><option value="female">{t('pt.female')}</option></Select>}</Field>
-        <Field label={t('new.channel')}>{(id) => <Select id={id} value={f.channel} onChange={(e) => set('channel', e.target.value)}><option value="whatsapp">WhatsApp</option><option value="telegram">Telegram</option><option value="link">{t('new.channelLink')}</option></Select>}</Field>
+        <PatientFields v={pv} set={(k, val) => set(k, val)} medical={!!medical} />
+        <div className="border-t border-line pt-1 sm:col-span-2"><p className="text-sm font-semibold text-primary">{t('dr.currentVisit')}</p></div>
         <Field label={t('new.examDate')} error={win?.dayOff ? t(dayOffKey(win.reason)) : undefined}>{(id) => <Input id={id} type="date" required min={today} value={f.date} onChange={(e) => set('date', e.target.value)} />}</Field>
         {!myDoctorId && <Field label={t('common.doctor')}>{(id) => <Select id={id} value={f.doctorId} onChange={(e) => set('doctorId', e.target.value)}>{doctors.filter((d) => d.active).map((d) => <option key={d.id} value={d.id}>{locale === 'ar' && d.name_ar ? d.name_ar : d.name}</option>)}</Select>}</Field>}
         <Field label={t('new.timeOptional')} error={!win?.dayOff && timeErr ? timeErr : undefined} hint={win?.from ? `${t('new.hours', { from: win.from, to: win.to! })} · ${t('new.timeHint')}` : t('new.timeHint')}>{(id) => <Input id={id} type="time" value={f.time} onChange={(e) => set('time', e.target.value)} />}</Field>

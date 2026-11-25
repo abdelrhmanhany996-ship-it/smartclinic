@@ -29,7 +29,7 @@ export default function DoctorPatients() {
             {p.allergies && <span className="chip chip-cancelled"><AlertTriangle className="size-3" />{p.allergies}</span>}
             <span className="text-sm text-muted">{t('pt.visits')}: <b className="text-ink">{p.visits}</b></span><span className="w-28 text-end text-sm text-muted tabular-nums">{p.lastVisit ?? '—'}</span></Link>; })}
       </Card>
-      <AddPatientModal open={add} onClose={() => setAdd(false)} doctors={clinicCtx.data?.doctors ?? []} myDoctorId={me?.doctorId} today={clinicCtx.data?.today ?? new Date().toISOString().slice(0, 10)} onCreated={() => reload()} />
+      <AddPatientModal medical open={add} onClose={() => setAdd(false)} doctors={clinicCtx.data?.doctors ?? []} myDoctorId={me?.doctorId} today={clinicCtx.data?.today ?? new Date().toISOString().slice(0, 10)} onCreated={() => reload()} />
     </>
   );
 }

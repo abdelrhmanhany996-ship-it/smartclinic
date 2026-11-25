@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, FileText, Plus, Printer, Send, 
 import { PageHeader } from '@/components/shell';
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Skeleton, StatusChip, Textarea, Time, cx } from '@/components/ui';
 import { Dictate } from '@/components/dictate';
+import { PatientFields } from '@/components/patient-fields';
 import { RxPrint, ageOf, rxLabels, RxPrintData } from '@/components/rx-print';
 import { usePrefs } from '@/components/providers';
 import { api, useLive } from '@/lib/client';
@@ -48,14 +49,14 @@ function PatientRecord() {
   };
   const me = useLive<any>('/api/auth/me', null).data?.user;
   const resend = async (rxId: string) => { try { await api(`/api/prescriptions/${rxId}/send`, { body: {} }); toast(t('rx.sent')); reload(); } catch (e: any) { toast(e.message, 'err'); } };
-  const saveProfile = async () => { try { await api(`/api/patients/${id}`, { method: 'PATCH', body: { fullName: edit.fullName, birthDate: edit.birthDate || null, gender: edit.gender || null, allergies: edit.allergies || null, chronic: edit.chronic || null, bloodType: edit.bloodType || null, notes: edit.notes || null } }); setEdit(null); reload(); toast(t('common.saved')); } catch (e: any) { toast(e.message, 'err'); } };
+  const saveProfile = async () => { try { await api(`/api/patients/${id}`, { method: 'PATCH', body: { fullName: edit.fullName, phone: edit.phone, channel: edit.channel, birthDate: edit.birthDate || null, gender: edit.gender || null, allergies: edit.allergies || null, chronic: edit.chronic || null, bloodType: edit.bloodType || null, notes: edit.notes || null } }); setEdit(null); reload(); toast(t('common.saved')); } catch (e: any) { toast(e.message, 'err'); } };
   const age = useMemo(() => ageOf(p?.birthDate), [p]);
 
   if (!data) return <Skeleton className="h-96" />;
   return (
     <>
       <Link href="/doctor/patients" className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" />{t('dr.back')}</Link>
-      <PageHeader title={p.fullName} sub={`${p.phone}${age != null ? ` · ${age} ${t('pt.years')}` : ''}${p.gender ? ` · ${t(`pt.${p.gender}`)}` : ''}`} right={<Button variant="secondary" icon={<Pencil className="size-4" />} onClick={() => setEdit({ ...p })}>{t('pt.editProfile')}</Button>} />
+      <PageHeader title={p.fullName} sub={`${p.phone}${age != null ? ` · ${age} ${t('pt.years')}` : ''}${p.gender ? ` · ${t(`pt.${p.gender}`)}` : ''}`} right={<Button variant="secondary" icon={<Pencil className="size-4" />} onClick={() => setEdit({ fullName: p.fullName, phone: p.phone, channel: p.channel ?? 'whatsapp', birthDate: p.birthDate ?? '', gender: p.gender ?? '', bloodType: p.bloodType ?? '', allergies: p.allergies ?? '', chronic: p.chronic ?? '', notes: p.notes ?? '' })}>{t('pt.editProfile')}</Button>} />
 
       {cur && <Card className="mb-5 border-primary/50"><div className="flex flex-wrap items-center gap-3 px-5 py-4"><span className="rounded-lg bg-primary px-3 py-1 text-lg font-bold text-primary-fg">{cur.ticket}</span><div className="flex-1"><p className="font-semibold">{t('dr.currentVisit')}</p><p className="text-sm text-muted"><Time v={cur.time} /> · {t(`visit.${cur.visitType}`)}</p></div><StatusChip status={cur.status} />
         {cur.status === 'in_consultation' ? <Button icon={<CheckCircle2 className="size-4" />} loading={busy === cur.id + 'end'} onClick={() => run(cur.id, 'end')}>{t('act.end')}</Button>
@@ -129,15 +130,9 @@ function PatientRecord() {
         </div>
       </div>
 
-      <Modal open={!!edit} onClose={() => setEdit(null)} title={t('pt.editProfile')} wide>{edit && <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t('new.fullName')}>{(fid) => <Input id={fid} value={edit.fullName} onChange={(e) => setEdit({ ...edit, fullName: e.target.value })} />}</Field>
-        <Field label={t('pt.dob')}>{(fid) => <Input id={fid} type="date" value={edit.birthDate ?? ''} onChange={(e) => setEdit({ ...edit, birthDate: e.target.value })} />}</Field>
-        <Field label={t('pt.gender')}>{(fid) => <Select id={fid} value={edit.gender ?? ''} onChange={(e) => setEdit({ ...edit, gender: e.target.value })}><option value="">—</option><option value="male">{t('pt.male')}</option><option value="female">{t('pt.female')}</option></Select>}</Field>
-        <Field label={t('pt.blood')}>{(fid) => <Select id={fid} value={edit.bloodType ?? ''} onChange={(e) => setEdit({ ...edit, bloodType: e.target.value })}><option value="">—</option>{['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((b) => <option key={b}>{b}</option>)}</Select>}</Field>
-        <Field label={t('pt.allergies')}>{(fid) => <Input id={fid} value={edit.allergies ?? ''} onChange={(e) => setEdit({ ...edit, allergies: e.target.value })} />}</Field>
-        <Field label={t('pt.chronic')}>{(fid) => <Input id={fid} value={edit.chronic ?? ''} onChange={(e) => setEdit({ ...edit, chronic: e.target.value })} />}</Field>
-        <div className="sm:col-span-2"><Field label={t('pt.notes')}>{(fid) => <div className="space-y-2"><Textarea id={fid} dir="auto" value={edit.notes ?? ''} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /><Dictate lang={dictLang} onText={(txt) => setEdit((x: any) => ({ ...x, notes: (x.notes ? x.notes + ' ' : '') + txt }))} /></div>}</Field></div>
-        <div className="flex justify-end sm:col-span-2"><Button onClick={saveProfile}>{t('common.save')}</Button></div></div>}</Modal>
+      <Modal open={!!edit} onClose={() => setEdit(null)} title={t('pt.editProfile')} wide>{edit && <form className="grid gap-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); saveProfile(); }}>
+        <PatientFields v={edit} set={(k, val) => setEdit((x: any) => ({ ...x, [k]: val }))} medical />
+        <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="secondary" onClick={() => setEdit(null)}>{t('common.cancel')}</Button><Button type="submit" disabled={edit.fullName.trim().length < 2 || edit.phone.replace(/\D/g, '').length < 8}>{t('common.save')}</Button></div></form>}</Modal>
       <RxPrint data={printing} labels={rxLabels(t)} dir={dir} />
     </>
   );

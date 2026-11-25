@@ -17,7 +17,9 @@ export const GET = route(STAFF, async ({ user, req }) => {
 });
 export const POST = route(STAFF, async ({ user, req }) => {
   const b = z.object({ fullName: z.string().trim().min(2).max(80), phone: z.string().min(7).max(20), date: z.string(), time: z.string().nullish(), doctorId: z.string().uuid(), visitType: z.string().min(1).max(30),
-    channel: z.enum(['whatsapp', 'telegram', 'link']), birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(), gender: z.enum(['male', 'female']).nullish(), reason: z.string().max(1000).nullish() }).parse(await req.json());
+    channel: z.enum(['whatsapp', 'telegram', 'link']), birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(), gender: z.enum(['male', 'female']).nullish(), reason: z.string().max(1000).nullish(),
+    allergies: z.string().max(500).nullish(), chronic: z.string().max(500).nullish(), bloodType: z.string().max(5).nullish(), notes: z.string().max(2000).nullish() }).parse(await req.json());
+  if (user.role !== 'doctor') { b.allergies = b.chronic = b.bloodType = null; } // medical fields are doctor-only
   if (user.role === 'doctor' && b.doctorId !== user.doctorId) throw new HttpError(403, 'Doctors can only book into their own queue');
   return registerVisit(user, b);
 });

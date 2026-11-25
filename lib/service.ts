@@ -171,7 +171,7 @@ export async function afterChange(clinicId: string, doctorId: string, dates: str
 }
 
 /* ---------- booking ---------- */
-export interface NewAppt { fullName: string; phone: string; date: string; time: string; doctorId: string; visitType: string; channel: 'whatsapp' | 'telegram' | 'link'; patientId?: string; birthDate?: string | null; gender?: 'male' | 'female' | null; reason?: string | null }
+export interface NewAppt { fullName: string; phone: string; date: string; time: string; doctorId: string; visitType: string; channel: 'whatsapp' | 'telegram' | 'link'; patientId?: string; birthDate?: string | null; gender?: 'male' | 'female' | null; reason?: string | null; allergies?: string | null; chronic?: string | null; bloodType?: string | null; notes?: string | null }
 
 export async function createAppointment(s: Session, input: NewAppt) {
   const clinicId = s.clinicId!;
@@ -189,10 +189,12 @@ export async function createAppointment(s: Session, input: NewAppt) {
     const clash = await c.query(`select count(*)::int n from appointments where doctor_id=$1 and appt_date=$2 and appt_time=$3 and status in ('booked','checked_in','in_consultation','completed','skipped')`, [input.doctorId, input.date, input.time]);
     if (clash.rows[0].n >= (clinic.settings.slot_capacity ?? 1)) throw bad('This slot is already booked', 409);
     const p = await c.query(
-      `insert into patients(clinic_id,full_name,phone,channel,birth_date,gender) values($1,$2,$3,$4,$5,$6)
+      `insert into patients(clinic_id,full_name,phone,channel,birth_date,gender,allergies,chronic_conditions,blood_type,notes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        on conflict (clinic_id,phone) do update set full_name=excluded.full_name, channel=excluded.channel,
-         birth_date=coalesce(excluded.birth_date, patients.birth_date), gender=coalesce(excluded.gender, patients.gender) returning id`,
-      [clinicId, input.fullName.trim(), phone, input.channel, input.birthDate || null, input.gender || null]);
+         birth_date=coalesce(excluded.birth_date, patients.birth_date), gender=coalesce(excluded.gender, patients.gender),
+         allergies=coalesce(excluded.allergies, patients.allergies), chronic_conditions=coalesce(excluded.chronic_conditions, patients.chronic_conditions),
+         blood_type=coalesce(excluded.blood_type, patients.blood_type), notes=coalesce(excluded.notes, patients.notes) returning id`,
+      [clinicId, input.fullName.trim(), phone, input.channel, input.birthDate || null, input.gender || null, input.allergies || null, input.chronic || null, input.bloodType || null, input.notes || null]);
     const seq = (await c.query('select coalesce(max(ticket_seq),100)+1 n from appointments where doctor_id=$1 and appt_date=$2', [input.doctorId, input.date])).rows[0].n;
     const sortKey = new Date(`${input.date}T${input.time}:00Z`).getTime() / 60000 + seq / 1000;
     const r = await c.query(

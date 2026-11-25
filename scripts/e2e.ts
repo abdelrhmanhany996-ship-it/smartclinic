@@ -118,13 +118,15 @@ async function main() {
   ok((await doc.req(`/api/appointments/${oq.id}/action`, { action: 'cancel' })).status === 403, "doctor cannot cancel another doctor's patient");
   ok((await doc.req(`/api/appointments/${nextW.id}/action`, { action: 'check_in' })).status === 403, 'doctor cannot do reception-only actions (check-in)');
   ok((await doc.req('/api/appointments', { fullName: 'X Y', phone: '01000000000', date: today, time: '10:00', doctorId: omar.id, visitType: 'consultation', channel: 'link' })).status === 403, "doctor cannot book into another doctor's queue");
-  const dreg = await doc.req('/api/appointments', { fullName: 'Doctor Added', phone: '01055500011', date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), doctorId: sara.id, visitType: 'xray', channel: 'telegram', birthDate: '1985-02-02', gender: 'male', reason: 'Chest X-ray, bring old films' });
+  const dreg = await doc.req('/api/appointments', { fullName: 'Doctor Added', phone: '01055500011', date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), doctorId: sara.id, visitType: 'xray', channel: 'telegram', birthDate: '1985-02-02', gender: 'male', reason: 'Chest X-ray, bring old films', allergies: 'Latex', chronic: 'Hypertension', bloodType: 'B+', notes: 'Prefers morning visits' });
   ok(dreg.status === 200 || (dreg.j?.error ?? '').includes('off'), 'add-patient flow: doctor registers patient + visit (first free time)');
   const off = await doc.req('/api/appointments', { fullName: 'Off Grid', phone: '01055500022', date: new Date(Date.now() + 4 * 86400000).toISOString().slice(0, 10), time: '10:22', doctorId: sara.id, visitType: 'consultation', channel: 'link' });
   ok(off.status === 200 && off.j.time === '10:22', 'booking accepts a typed time that is not on the 15-min grid (10:22)');
   const early = await doc.req('/api/appointments', { fullName: 'Too Early', phone: '01055500033', date: new Date(Date.now() + 4 * 86400000).toISOString().slice(0, 10), time: '23:59', doctorId: sara.id, visitType: 'consultation', channel: 'link' });
   ok(early.status === 409 && /working hours/i.test(early.j.error), 'time outside working hours gives a clear error naming the hours');
   if (dreg.status === 200) {
+    const pr = (await doc.req(`/api/patients/${dreg.j.patientId}`)).j.patient;
+    ok(pr.allergies === 'Latex' && pr.chronic === 'Hypertension' && pr.bloodType === 'B+' && pr.notes === 'Prefers morning visits', 'add form saves the same data fields as the edit form (allergies, chronic, blood type, notes)');
     ok(dreg.j.telegramUrl.startsWith('https://t.me/share/url') && dreg.j.link.includes('/t/'), 'telegram message with the patient app link is ready');
     const tv = await track(dreg.j.token); ok(tv.appointment.reason === 'Chest X-ray, bring old films' && tv.appointment.visitType === 'xray', 'visit details (X-ray note) saved and visible in patient app');
     ok((await doc.req(`/api/appointments/${dreg.j.id}/action`, { action: 'reschedule', date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), time: '10:07' })).status === 200, 'doctor postpones with a typed time (10:07)');
