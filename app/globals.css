@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #ffffff; --surface: #F4F8FA; --card: #ffffff; --raised: #ffffff; --border: #DCE6EC;
+  --text: #102A43; --muted: #5B7083; --primary: #087E83; --primary-fg: #ffffff; --primary-soft: #E2F3F3;
+  --sidebar: #102A43; --sidebar-fg: #BFD0DD; --sidebar-active: #087E83; --danger: #B42318; --focus: #087E83;
+  --wait-bg: #FEF3D7; --wait-fg: #8A5A00; --consult-bg: #DDF0FD; --consult-fg: #0B6AA8; --done-bg: #DDF6E8; --done-fg: #12724A;
+  --bad-bg: #FDE4E4; --bad-fg: #B42318; --neutral-bg: #E8EEF3; --neutral-fg: #3E5568; --teal-bg: #D9F2F1; --teal-fg: #06666A;
+  color-scheme: light;
+}
+.dark {
+  --bg: #071D2D; --surface: #0B2436; --card: #122A3A; --raised: #1E3A4C; --border: #254357;
+  --text: #ffffff; --muted: #9FB6C6; --primary: #65DACA; --primary-fg: #071D2D; --primary-soft: rgba(101,218,202,.14);
+  --sidebar: #0A2133; --sidebar-fg: #A9C0D0; --sidebar-active: #1E3A4C; --danger: #FF8E8E; --focus: #65DACA;
+  --wait-bg: rgba(245,180,40,.16); --wait-fg: #F5C451; --consult-bg: rgba(80,170,240,.18); --consult-fg: #86C8F6; --done-bg: rgba(101,218,202,.16); --done-fg: #65DACA;
+  --bad-bg: rgba(255,110,110,.16); --bad-fg: #FF9A9A; --neutral-bg: rgba(255,255,255,.08); --neutral-fg: #C5D5E0; --teal-bg: rgba(101,218,202,.14); --teal-fg: #65DACA;
+  color-scheme: dark;
+}
+@theme inline {
+  --color-bg: var(--bg); --color-surface: var(--surface); --color-card: var(--card); --color-raised: var(--raised); --color-line: var(--border);
+  --color-ink: var(--text); --color-muted: var(--muted); --color-primary: var(--primary); --color-primary-fg: var(--primary-fg); --color-primary-soft: var(--primary-soft);
+  --color-sidebar: var(--sidebar); --color-sidebar-fg: var(--sidebar-fg); --color-sidebar-active: var(--sidebar-active); --color-danger: var(--danger);
+  --font-sans: Inter, "Noto Sans Arabic", system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+}
+html { -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; }
+[dir="rtl"] body { font-family: "Noto Sans Arabic", "Segoe UI", Tahoma, system-ui, sans-serif; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+::selection { background: var(--primary); color: var(--primary-fg); }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.chip-waiting, .chip-booked { background: var(--wait-bg); color: var(--wait-fg); }
+.chip-checked_in { background: var(--teal-bg); color: var(--teal-fg); }
+.chip-in_consultation { background: var(--consult-bg); color: var(--consult-fg); }
+.chip-completed { background: var(--done-bg); color: var(--done-fg); }
+.chip-cancelled, .chip-no_show { background: var(--bad-bg); color: var(--bad-fg); }
+.chip-skipped { background: var(--neutral-bg); color: var(--neutral-fg); }
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 45%, transparent); } 100% { box-shadow: 0 0 0 16px transparent; } }
+.pulse { animation: pulse-ring 1.8s infinite; }
+@keyframes pop { from { transform: scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+.pop { animation: pop .18s ease-out; }
+@keyframes slide-up { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.slide-up { animation: slide-up .25s ease-out; }
+.skeleton { background: linear-gradient(90deg, var(--surface), var(--border), var(--surface)); background-size: 200% 100%; animation: sk 1.2s infinite; border-radius: 8px; }
+@keyframes sk { to { background-position: -200% 0; } }
+.scroll-thin::-webkit-scrollbar { height: 8px; width: 8px; } .scroll-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+.safe-b { padding-bottom: max(16px, env(safe-area-inset-bottom)); }

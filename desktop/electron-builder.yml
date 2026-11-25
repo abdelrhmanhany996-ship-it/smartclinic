@@ -1,0 +1,6 @@
+appId: app.smartclinic.desktop
+productName: SmartClinic
+directories: { output: dist }
+files: [desktop/**, public/icons/**, public/offline.html, package.json]
+win: { target: [nsis], icon: public/icons/icon-512.png }
+nsis: { oneClick: false, allowToChangeInstallationDirectory: true }
